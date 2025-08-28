@@ -14,7 +14,31 @@ const app = express();
 
 app.use(
     cors({
-        origin: ["https://audit-frontend-zeta.vercel.app", "http://localhost:5173"],
+        origin: function (origin, callback) {
+            // Allow requests with no origin (like mobile apps, curl, etc.)
+            if (!origin) return callback(null, true);
+            
+            // List of allowed origins
+            const allowedOrigins = [
+                "https://audit-frontend-zeta.vercel.app",
+                "http://localhost:5173",
+                /\.vercel\.app$/ // Allow all Vercel deployments
+            ];
+            
+            // Check if the origin matches any allowed pattern
+            if (allowedOrigins.some(allowedOrigin => {
+                if (typeof allowedOrigin === 'string') {
+                    return origin === allowedOrigin;
+                } else if (allowedOrigin instanceof RegExp) {
+                    return allowedOrigin.test(origin);
+                }
+                return false;
+            })) {
+                return callback(null, true);
+            }
+            
+            return callback(new Error('Not allowed by CORS'));
+        },
         methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
         allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization"],
         credentials: true,
