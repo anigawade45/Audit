@@ -15,7 +15,7 @@ const app = express();
 app.use(
     cors({
         origin: [
-            "https://audit-umber-chi.vercel.app",
+            "https://audit-frontend-zeta.vercel.app",
             "http://localhost:5173"
         ],
         credentials: true,
