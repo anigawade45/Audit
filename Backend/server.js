@@ -12,18 +12,15 @@ dotenv.config();
 
 const app = express();
 
-// Enable CORS
 app.use(
     cors({
-        origin: [
-            "https://audit-frontend-zeta.vercel.app",
-            "http://localhost:5173"
-        ],
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
+        origin: ["https://audit-frontend-zeta.vercel.app", "http://localhost:5173"],
+        methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
+        allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization"],
         credentials: true,
     })
 );
+
 
 // Handle preflight requests for all routes
 app.options("*", cors());
