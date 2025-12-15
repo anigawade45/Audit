@@ -311,61 +311,7 @@ export default function CashBook() {
     }
   };
 
-  const yearlyBalances = useMemo(() => {
-    const balances = {};
-    const sorted = [...entries].sort(
-      (a, b) => new Date(a.date) - new Date(b.date)
-    );
-
-    let prevClosing = Number(societyInfo?.initialBalance) || 0;
-
-    const fiscalOrder = [
-      ...new Set(sorted.map((e) => fiscalLabelFromDate(e.date))),
-    ].sort((a, b) => parseInt(a) - parseInt(b));
-
-    fiscalOrder.forEach((fy) => {
-      const { start, end } = fiscalRangeFromLabel(fy);
-
-      const fyEntries = sorted.filter((e) => e.date >= start && e.date <= end);
-
-      let running = prevClosing;
-
-      const daily = {};
-      const uniqueDates = [...new Set(fyEntries.map((e) => e.date))];
-
-      uniqueDates.forEach((date) => {
-        const debitEntries = fyEntries.filter(
-          (e) => e.date === date && e.type === "debit"
-        );
-        const creditEntries = fyEntries.filter(
-          (e) => e.date === date && e.type === "credit"
-        );
-
-        const totalDebit = debitEntries.reduce((s, e) => s + e.amount, 0);
-        const totalCredit = creditEntries.reduce((s, e) => s + e.amount, 0);
-
-        const opening = running;
-        const todayExpense = totalCredit;
-        const closing = opening + totalDebit - todayExpense;
-
-        daily[date] = {
-          date,
-          opening,
-          debitEntries,
-          creditEntries,
-          todayExpense,
-          closing,
-        };
-
-        running = closing;
-      });
-
-      balances[fy] = { opening: prevClosing, daily, closing: running };
-      prevClosing = running; // pass closing forward to next year
-    });
-
-    return balances;
-  }, [entries, societyInfo?.initialBalance]);
+  /* removed unused yearlyBalances */
 
   const dailyData = useMemo(() => {
     if (!selectedFiscalYear) return {};
@@ -486,18 +432,18 @@ export default function CashBook() {
   });
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-4">
+    <div className="px-4 sm:px-6 py-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
         <div className="w-full text-center">
-          <h1 className="text-4xl font-bold">रोजकिर्द</h1>
+          <h1 className="text-2xl sm:text-4xl font-bold">रोजकिर्द</h1>
           <div className="mt-4 text-semibold">
-            <div className="flex items-center gap-2">
-              <label className="mr-2">वर्ष (Year):</label>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <label className="sm:mr-2">वर्ष (Year):</label>
               <Select
                 value={selectedFiscalYear}
                 onValueChange={(val) => setSelectedFiscalYear(val)}
               >
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="वर्ष निवडा" />
                 </SelectTrigger>
                 <SelectContent>
@@ -511,8 +457,8 @@ export default function CashBook() {
             </div>
           </div>
         </div>
-        <div className="ml-4 flex gap-2">
-          <Button variant="outline" onClick={exportToPDF} className="gap-2">
+        <div className="sm:ml-4 flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={exportToPDF} className="gap-2 w-full sm:w-auto">
             <Download className="w-4 h-4" /> Export PDF
           </Button>
           <Button
@@ -520,7 +466,7 @@ export default function CashBook() {
             onClick={() =>
               deleteMode ? setShowConfirm(true) : setDeleteMode((prev) => !prev)
             }
-            className="gap-2"
+            className="gap-2 w-full sm:w-auto"
           >
             <Trash2 className="w-4 h-4" />
             {deleteMode ? "Confirm Delete" : "Delete"}
@@ -538,7 +484,7 @@ export default function CashBook() {
               addEntry();
             }}
           >
-            <div className="grid md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
               {" "}
               <Input
                 type="date"
@@ -547,6 +493,7 @@ export default function CashBook() {
                 onChange={(e) =>
                   setNewEntry((prev) => ({ ...prev, date: e.target.value }))
                 }
+                className="w-full"
               />{" "}
               <Select
                 value={newEntry.type}
@@ -624,7 +571,7 @@ export default function CashBook() {
                     setNewEntry((prev) => ({ ...prev, customHead: txt }))
                   }
                   placeholder="इतर शीर्षक (मराठीत टाका)"
-                  renderComponent={(props) => <Input {...props} />}
+                  renderComponent={(props) => <Input {...props} className="w-full" />}
                 />
               )}
               <ReactTransliterate
@@ -654,9 +601,10 @@ export default function CashBook() {
                 onChange={(e) =>
                   setNewEntry((prev) => ({ ...prev, amount: e.target.value }))
                 }
+                className="w-full"
               />{" "}
             </div>{" "}
-            <Button type="submit6" className="mt-4 gap-2">
+            <Button type="submit6" className="mt-4 gap-2 w-full sm:w-auto">
               {" "}
               <Plus className="w-4 h-4" /> Add Entry{" "}
             </Button>{" "}
@@ -677,18 +625,18 @@ export default function CashBook() {
           <p className="mt-3 text-lg font-bold">रोजकिर्द</p>{" "}
         </div>
         <Card>
-          <CardContent className="p-0">
-            <Table>
+          <CardContent className="p-0 overflow-x-auto -mx-4 sm:mx-0">
+            <Table className="min-w-[480px] sm:min-w-full text-xs sm:text-sm">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-center font-bold">
+                  <TableHead className="text-center font-bold p-2 sm:p-3">
                     जमा तपशील
                   </TableHead>
-                  <TableHead className="text-center font-bold">रक्कम</TableHead>
-                  <TableHead className="text-center font-bold">
+                  <TableHead className="text-center font-bold p-2 sm:p-3">रक्कम</TableHead>
+                  <TableHead className="text-center font-bold p-2 sm:p-3">
                     खर्च तपशील
                   </TableHead>
-                  <TableHead className="text-center font-bold">रक्कम</TableHead>
+                  <TableHead className="text-center font-bold p-2 sm:p-3">रक्कम</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -703,16 +651,16 @@ export default function CashBook() {
                     (Number(day.closing) || 0);
                   return (
                     <React.Fragment key={day.date}>
-                      <TableRow className="bg-gray-100 border-t-2 border-b-2">
-                        <TableCell className="font-bold">
+                      <TableRow className="bg-gray-100 border-t-2 border-b-2 text-xs sm:text-sm">
+                        <TableCell className="font-bold p-2 sm:p-3">
                           तारीख: {formatDate(day.date)}
                           <br /> आरंभी शिल्लक
                         </TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="text-center p-2 sm:p-3">
                           ₹ {day.opening?.toLocaleString?.() ?? day.opening}
                         </TableCell>
-                        <TableCell></TableCell>
-                        <TableCell></TableCell>
+                        <TableCell className="p-2 sm:p-3"></TableCell>
+                        <TableCell className="p-2 sm:p-3"></TableCell>
                       </TableRow>
                       {(() => {
                         const maxRows = Math.max(
@@ -725,13 +673,13 @@ export default function CashBook() {
                             const c = day.creditEntries[idx];
                             return (
                               <TableRow key={`${day.date}-${idx}`}>
-                                <TableCell className="max-w-20">
+                                <TableCell className="max-w-20 p-2 sm:p-3 align-top text-xs sm:text-sm">
                                   {d ? (
                                     <>
                                       {deleteMode && (
                                         <input
                                           type="checkbox"
-                                          className="mr-2"
+                                          className="mr-2 size-4"
                                           checked={selectedIds.includes(d._id)}
                                           onChange={() => toggleSelect(d._id)}
                                         />
@@ -740,27 +688,27 @@ export default function CashBook() {
                                         {d.accountHead}
                                       </strong>
                                       {d.description && (
-                                        <div className="text-3xs whitespace-normal break-words">
+                                        <div className="text-[10px] sm:text-xs whitespace-normal break-words">
                                           {d.description}
                                         </div>
                                       )}
                                     </>
                                   ) : null}
                                 </TableCell>
-                                <TableCell className="text-center">
+                                <TableCell className="text-center p-2 sm:p-3 text-xs sm:text-sm">
                                   {d
                                     ? `₹ ${
                                         d.amount?.toLocaleString?.() ?? d.amount
                                       }`
                                     : ""}
                                 </TableCell>
-                                <TableCell className="max-w-20">
+                                <TableCell className="max-w-20 p-2 sm:p-3 align-top text-xs sm:text-sm">
                                   {c ? (
                                     <>
                                       {deleteMode && (
                                         <input
                                           type="checkbox"
-                                          className="mr-2"
+                                          className="mr-2 size-4"
                                           checked={selectedIds.includes(c._id)}
                                           onChange={() => toggleSelect(c._id)}
                                         />
@@ -769,14 +717,14 @@ export default function CashBook() {
                                         {c.accountHead}
                                       </strong>
                                       {c.description && (
-                                        <div className="text-3xs whitespace-normal break-words">
+                                        <div className="text-[10px] sm:text-xs whitespace-normal break-words">
                                           {c.description}
                                         </div>
                                       )}
                                     </>
                                   ) : null}
                                 </TableCell>
-                                <TableCell className="text-center">
+                                <TableCell className="text-center p-2 sm:p-3 text-xs sm:text-sm">
                                   {c
                                     ? `₹ ${
                                         c.amount?.toLocaleString?.() ?? c.amount
@@ -788,45 +736,45 @@ export default function CashBook() {
                           }
                         );
                       })()}
-                      <TableRow className="h-[36px]">
-                        <TableCell></TableCell>
-                        <TableCell></TableCell>
+                      <TableRow className="h-[36px] text-xs sm:text-sm">
+                        <TableCell className="p-2 sm:p-3"></TableCell>
+                        <TableCell className="p-2 sm:p-3"></TableCell>
                       </TableRow>
-                      <TableRow className="h-[36px]">
-                        <TableCell></TableCell>
-                        <TableCell></TableCell>
+                      <TableRow className="h-[36px] text-xs sm:text-sm">
+                        <TableCell className="p-2 sm:p-3"></TableCell>
+                        <TableCell className="p-2 sm:p-3"></TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell></TableCell>
-                        <TableCell></TableCell>
-                        <TableCell className="font-bold">आजचा खर्च</TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="p-2 sm:p-3"></TableCell>
+                        <TableCell className="p-2 sm:p-3"></TableCell>
+                        <TableCell className="font-bold p-2 sm:p-3 text-xs sm:text-sm">आजचा खर्च</TableCell>
+                        <TableCell className="text-center p-2 sm:p-3 text-xs sm:text-sm">
                           ₹ {day.todayExpense}
                         </TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell></TableCell>
-                        <TableCell></TableCell>
-                        <TableCell className="font-bold">
+                        <TableCell className="p-2 sm:p-3"></TableCell>
+                        <TableCell className="p-2 sm:p-3"></TableCell>
+                        <TableCell className="font-bold p-2 sm:p-3 text-xs sm:text-sm">
                           अखेरी शिल्लक
                         </TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="text-center p-2 sm:p-3 text-xs sm:text-sm">
                           ₹ {day.closing}
                         </TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell className="font-bold">एकूण</TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="font-bold p-2 sm:p-3 text-xs sm:text-sm">एकूण</TableCell>
+                        <TableCell className="text-center p-2 sm:p-3 text-xs sm:text-sm">
                           ₹ {ekunLeft.toLocaleString()}
                         </TableCell>
-                        <TableCell className="font-bold">एकूण</TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="font-bold p-2 sm:p-3 text-xs sm:text-sm">एकूण</TableCell>
+                        <TableCell className="text-center p-2 sm:p-3 text-xs sm:text-sm">
                           ₹ {ekunRight.toLocaleString()}
                         </TableCell>
                       </TableRow>
                       <TableRow className="h-[45px]">
-                        <TableCell></TableCell>
-                        <TableCell></TableCell>
+                        <TableCell className="p-2 sm:p-3"></TableCell>
+                        <TableCell className="p-2 sm:p-3"></TableCell>
                       </TableRow>
                     </React.Fragment>
                   );

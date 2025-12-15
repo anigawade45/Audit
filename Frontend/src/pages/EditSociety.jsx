@@ -49,10 +49,6 @@ export default function EditSociety() {
 
         const s = res.data;
 
-        // Format dates as YYYY-MM-DD for input type=date
-        const formatDate = (dateStr) =>
-          dateStr ? new Date(dateStr).toISOString().split("T")[0] : "";
-
         setFormData({
           name: s.society.name || "",
           secretaryName: s.society.secretaryName || "",
@@ -120,7 +116,7 @@ export default function EditSociety() {
   if (loading) return <p className="text-center py-12">Loading...</p>;
 
   return (
-    <div className="p-6">
+    <div className="px-4 sm:px-6 py-6">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
           <Button
@@ -134,7 +130,7 @@ export default function EditSociety() {
             />
           </Button>
           <div>
-            <h1>Edit Society</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold">Edit Society</h1>
             <p className="text-muted-foreground">Update society information</p>
           </div>
         </div>
@@ -142,7 +138,7 @@ export default function EditSociety() {
         <Card>
           <form onSubmit={handleSubmit}>
             <CardHeader className="space-y-1 text-center font-bold mb-5">
-              <h1>संस्थेची माहिती (Society Information)</h1>
+              <h1 className="text-xl sm:text-2xl">संस्थेची माहिती (Society Information)</h1>
             </CardHeader>
 
             <CardContent className="space-y-6">
@@ -155,7 +151,7 @@ export default function EditSociety() {
                   onChangeText={(txt) => handleChange("name", txt)}
                   placeholder="उदा. ए बी सी सहकारी संस्था मर्यादित चिपळूण"
                   renderComponent={(props) => (
-                    <Input {...props} id="name" required />
+                    <Input {...props} id="name" required className="w-full" />
                   )}
                 />
               </div>
@@ -171,7 +167,7 @@ export default function EditSociety() {
                   onChangeText={(txt) => handleChange("secretaryName", txt)}
                   placeholder="उदा. राज अशोक निकम"
                   renderComponent={(props) => (
-                    <Input {...props} id="secretary" required />
+                    <Input {...props} id="secretary" required className="w-full" />
                   )}
                 />
               </div>
@@ -190,6 +186,7 @@ export default function EditSociety() {
                   }
                   placeholder="0"
                   step="100"
+                  className="w-full"
                 />
               </div>
 
@@ -201,7 +198,7 @@ export default function EditSociety() {
                   value={formData.taluka}
                   onChangeText={(txt) => handleChange("taluka", txt)}
                   placeholder="उदा. चिपळूण"
-                  renderComponent={(props) => <Input {...props} id="taluka" />}
+                  renderComponent={(props) => <Input {...props} id="taluka" className="w-full" />}
                 />
               </div>
 
@@ -214,7 +211,7 @@ export default function EditSociety() {
                   onChangeText={(txt) => handleChange("district", txt)}
                   placeholder="उदा. रत्नागिरी"
                   renderComponent={(props) => (
-                    <Input {...props} id="district" />
+                    <Input {...props} id="district" className="w-full" />
                   )}
                 />
               </div>
@@ -228,21 +225,21 @@ export default function EditSociety() {
                   onChangeText={(txt) => handleChange("address", txt)}
                   placeholder="उदा. चिपळूण, रत्नागिरी"
                   renderComponent={(props) => (
-                    <Textarea {...props} id="address" rows={3} />
+                    <Textarea {...props} id="address" rows={3} className="w-full" />
                   )}
                 />
               </div>
 
               <div className="space-y-3">
                 <Label>संस्थेचा प्रकार (Society Type)</Label>
-                <div className="flex gap-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                   <Button
                     type="button"
                     variant={
                       formData.type === "housing" ? "default" : "outline"
                     }
                     onClick={() => handleChange("type", "housing")}
-                    className="flex-1"
+                    className="w-full sm:flex-1"
                   >
                     गृहनिर्माण सोसायटी (Housing Society)
                   </Button>
@@ -250,7 +247,7 @@ export default function EditSociety() {
                     type="button"
                     variant={formData.type === "labour" ? "default" : "outline"}
                     onClick={() => handleChange("type", "labour")}
-                    className="flex-1"
+                    className="w-full sm:flex-1"
                   >
                     श्रमिक व इतर सोसायटी (Labour & Other Society)
                   </Button>
@@ -269,6 +266,7 @@ export default function EditSociety() {
                     onChange={(e) =>
                       handleChange("financialYearStart", e.target.value)
                     }
+                    className="w-full"
                   />
                 </div>
 
@@ -283,20 +281,22 @@ export default function EditSociety() {
                     onChange={(e) =>
                       handleChange("financialYearEnd", e.target.value)
                     }
+                    className="w-full"
                   />
                 </div>
               </div>
             </CardContent>
 
-            <CardFooter className="gap-3 flex justify-center mt-5">
+            <CardFooter className="gap-3 flex flex-col sm:flex-row sm:justify-center mt-5">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => navigate("/dashboard")}
+                className="w-full sm:w-auto"
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={saving}>
+              <Button type="submit" disabled={saving} className="w-full sm:w-auto">
                 {saving ? "Saving..." : "Update Society"}
               </Button>
             </CardFooter>

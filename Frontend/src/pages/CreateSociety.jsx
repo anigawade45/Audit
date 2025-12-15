@@ -83,11 +83,13 @@ export default function CreateSociety({
   };
 
   return (
-    <div className="p-6">
+    <div className="px-4 sm:px-6 py-6">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
           <div>
-            <h1>{society ? "Edit Society" : "Add New Society"}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold">
+              {society ? "Edit Society" : "Add New Society"}
+            </h1>
             <p className="text-muted-foreground">
               {society
                 ? "Update society information"
@@ -98,7 +100,7 @@ export default function CreateSociety({
         <Card>
           <form onSubmit={handleSubmit}>
             <CardHeader className="space-y-1 text-center font-bold mb-5">
-              <h1>संस्थेची माहिती (Society Information)</h1>
+              <h1 className="text-xl sm:text-2xl">संस्थेची माहिती (Society Information)</h1>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
@@ -110,7 +112,7 @@ export default function CreateSociety({
                   onChangeText={(text) => handleChange("name", text)}
                   placeholder="उदा. ए बी सी सहकारी संस्था मर्यादित चिपळूण"
                   required
-                  renderComponent={(props) => <Input {...props} />}
+                  renderComponent={(props) => <Input {...props} className="w-full" />}
                 />
               </div>
               <div className="grid gap-4 md:grid-cols-2">
@@ -125,7 +127,7 @@ export default function CreateSociety({
                     onChangeText={(text) => handleChange("secretaryName", text)}
                     placeholder="उदा. राज अशोक निकम"
                     required
-                    renderComponent={(props) => <Input {...props} />}
+                    renderComponent={(props) => <Input {...props} className="w-full" />}
                   />
                 </div>
                 <div className="space-y-2">
@@ -141,6 +143,7 @@ export default function CreateSociety({
                     }
                     placeholder="0"
                     step="100"
+                    className="w-full"
                   />
                 </div>
               </div>
@@ -153,7 +156,7 @@ export default function CreateSociety({
                     value={formData.taluka}
                     onChangeText={(text) => handleChange("taluka", text)}
                     placeholder="उदा. चिपळूण"
-                    renderComponent={(props) => <Input {...props} />}
+                    renderComponent={(props) => <Input {...props} className="w-full" />}
                   />
                 </div>
                 <div className="space-y-2">
@@ -164,7 +167,7 @@ export default function CreateSociety({
                     value={formData.district}
                     onChangeText={(text) => handleChange("district", text)}
                     placeholder="उदा. रत्नागिरी"
-                    renderComponent={(props) => <Input {...props} />}
+                    renderComponent={(props) => <Input {...props} className="w-full" />}
                   />
                 </div>
               </div>
@@ -176,19 +179,19 @@ export default function CreateSociety({
                   value={formData.address}
                   onChangeText={(text) => handleChange("address", text)}
                   placeholder="उदा. चिपळूण, रत्नागिरी"
-                  renderComponent={(props) => <Textarea {...props} rows={3} />}
+                  renderComponent={(props) => <Textarea {...props} rows={3} className="w-full" />}
                 />
               </div>
               <div className="space-y-3">
                 <Label>संस्थेचा प्रकार (Society Type)</Label>
-                <div className="flex gap-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                   <Button
                     type="button"
                     variant={
                       formData.type === "housing" ? "default" : "outline"
                     }
                     onClick={() => handleChange("type", "housing")}
-                    className="flex-1"
+                    className="w-full sm:flex-1"
                   >
                     गृहनिर्माण सोसायटी (Housing Society)
                   </Button>
@@ -196,7 +199,7 @@ export default function CreateSociety({
                     type="button"
                     variant={formData.type === "labour" ? "default" : "outline"}
                     onClick={() => handleChange("type", "labour")}
-                    className="flex-1"
+                    className="w-full sm:flex-1"
                   >
                     श्रमिक व इतर सोसायटी (Labour & Other Society)
                   </Button>
@@ -214,6 +217,7 @@ export default function CreateSociety({
                     onChange={(e) =>
                       handleChange("financialYearStart", e.target.value)
                     }
+                    className="w-full"
                   />
                 </div>
                 <div className="space-y-2">
@@ -227,15 +231,16 @@ export default function CreateSociety({
                     onChange={(e) =>
                       handleChange("financialYearEnd", e.target.value)
                     }
+                    className="w-full"
                   />
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="gap-3 flex justify-center mt-5">
-              <Button type="button" variant="outline" onClick={onCancel}>
+            <CardFooter className="gap-3 flex flex-col sm:flex-row sm:justify-center mt-5">
+              <Button type="button" variant="outline" onClick={onCancel} className="w-full sm:w-auto">
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                 {loading
                   ? "Saving..."
                   : society

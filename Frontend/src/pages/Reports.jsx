@@ -33,7 +33,7 @@ export default function Reports() {
       }
     };
     fetchSociety();
-  }, [id]);
+  }, [id, token]);
 
   if (!society) {
     return <p className="text-center py-12">Loading...</p>;
@@ -77,24 +77,24 @@ export default function Reports() {
       : baseCards;
 
   return (
-    <div className="p-6">
+    <div className="px-4 sm:px-6 py-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">{society.name} Reports (अहवाल)</h1>
+        <h1 className="text-xl sm:text-2xl font-bold">{society.name} Reports (अहवाल)</h1>
         <p className="text-muted-foreground">
           Select a report to view (अहवाल प्रकार निवडा)
         </p>
       </div>
 
       {/* Report Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         {reportCards.map((report) => (
           <Card
             key={report.key}
-            className="p-6 cursor-pointer hover:shadow-xl transition-all rounded-2xl flex flex-col items-center justify-center text-center border border-gray-200"
+            className="p-4 sm:p-6 cursor-pointer hover:shadow-xl transition-all rounded-2xl flex flex-col items-center justify-center text-center border border-gray-200"
             onClick={() => navigate(`/reports/${id}/${report.key}`)}
           >
-            <CardHeader className="mb-4">{report.icon}</CardHeader>
+            <CardHeader className="mb-3 sm:mb-4">{report.icon}</CardHeader>
             <CardContent>
               <h3 className="font-semibold">{report.label}</h3>
               <p className="text-xs text-muted-foreground">

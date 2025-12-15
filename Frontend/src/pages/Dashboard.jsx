@@ -30,11 +30,7 @@ import {
 } from "@/components/DashboardSkeleton";
 import { cn } from "@/lib/utils";
 
-export default function Dashboard({
-  onSelectSociety,
-  onEditSociety,
-  onViewReports,
-}) {
+export default function Dashboard() {
   const { token } = useContext(AuthContext);
   const [societies, setSocieties] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -123,7 +119,7 @@ export default function Dashboard({
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-black font-bold text-3xl">
+            <h1 className="text-black font-bold text-2xl sm:text-3xl">
               Manage your societies and accounts
             </h1>
             <p className="text-muted-foreground">
@@ -150,11 +146,11 @@ export default function Dashboard({
   }
 
   return (
-    <div className="p-6">
+    <div className="px-4 sm:px-6 py-6 max-w-7xl mx-auto">
       {/* Header Section */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-black font-bold text-3xl mb-2">
+          <h1 className="text-black font-bold text-2xl sm:text-3xl mb-2">
             Manage your societies and accounts
           </h1>
           <p className="text-muted-foreground">
@@ -176,7 +172,7 @@ export default function Dashboard({
 
           <Button
             onClick={() => navigate("/create-society")}
-            className="gap-2 shrink-0"
+            className="gap-2 shrink-0 w-full sm:w-auto"
           >
             <Plus className="w-4 h-4" /> Add New Society
           </Button>
@@ -184,7 +180,7 @@ export default function Dashboard({
       </div>
 
       {/* Statistics and Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card className="p-4">
           <div className="text-2xl font-bold text-primary">{stats.total}</div>
           <div className="text-sm text-muted-foreground">Total Societies</div>
@@ -211,12 +207,12 @@ export default function Dashboard({
 
       {/* Filter Controls */}
       <div className="flex flex-wrap gap-4 mb-6">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
           <span className="text-sm font-medium">Filter:</span>
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="px-3 py-1 border rounded-md text-sm"
+            className="px-3 py-1 border rounded-md text-sm w-full sm:w-auto"
           >
             <option value="all">All Types</option>
             <option value="labour">Labour Societies</option>
@@ -224,12 +220,12 @@ export default function Dashboard({
           </select>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
           <span className="text-sm font-medium">Sort by:</span>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="px-3 py-1 border rounded-md text-sm"
+            className="px-3 py-1 border rounded-md text-sm w-full sm:w-auto"
           >
             <option value="name">Name</option>
             <option value="type">Type</option>
@@ -277,7 +273,7 @@ export default function Dashboard({
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {filteredSocieties.map((society) => (
               <Card
                 key={society._id}
@@ -306,7 +302,7 @@ export default function Dashboard({
                     variant="ghost"
                     size="sm"
                     onClick={() => navigate(`/edit-society/${society._id}`)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                     title="Edit Society"
                   >
                     <Edit className="w-4 h-4" />

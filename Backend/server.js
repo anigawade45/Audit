@@ -13,35 +13,27 @@ dotenv.config();
 
 const app = express();
 
-app.use(
-    cors({
-        origin: function (origin, callback) {
-            // Allow requests with no origin (like mobile apps, curl, etc.)
-            if (!origin) return callback(null, true);
-            
-            // List of allowed origins
-            const allowedOrigins = [
-                "https://audit-frontend-zeta.vercel.app",
-                "http://localhost:5173"
-            ];
-            
-            // Check if the origin matches any allowed pattern
-            if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
-                return callback(null, true);
-            }
-            
-            // For development, log the origin that's being blocked
-            console.log('Blocked CORS origin:', origin);
-            return callback(new Error('Not allowed by CORS'));
-        },
-        methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
-        allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization"],
-        credentials: true,
-    })
-);
+// Define a single corsOptions object and reuse it
+const corsOptions = {
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        const allowedOrigins = [
+            "https://audit-frontend-zeta.vercel.app",
+            "http://localhost:5173"
+        ];
+        if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+            return callback(null, true);
+        }
+        console.log('Blocked CORS origin:', origin);
+        return callback(new Error('Not allowed by CORS'));
+    },
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
+    allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization"],
+    credentials: true,
+};
 
-// Handle preflight requests for all routes
-app.options("*", cors());
+app.use(cors(corsOptions));
+// Handle preflight requests for all routes with SAME options
 
 // **Parse JSON BEFORE routes**
 app.use(express.json());
@@ -55,6 +47,12 @@ app.use("/api/account-heads", accountHeadRoutes);
 
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI;
+
+if (!MONGO_URI) {
+    console.error("Missing MONGO_URI environment variable");
+    // You can either throw or return early to avoid misleading runtime
+    process.exit(1);
+}
 
 // Connect to MongoDB with better error handling for Vercel
 mongoose.connection.on('error', err => {

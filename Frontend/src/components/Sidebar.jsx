@@ -16,7 +16,7 @@ import { AuthContext } from "@/context/AppContext";
 import { toast } from "sonner";
 import PropTypes from "prop-types";
 
-const AppSidebar = ({ currentPage, onNavigate }) => {
+const AppSidebar = () => {
   const [isOpen, setIsOpen] = useState(true);
   const { setToken } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -57,25 +57,6 @@ const AppSidebar = ({ currentPage, onNavigate }) => {
     setToken(null);
     toast.success("Logged out successfully");
     navigate("/login");
-  };
-
-  const handleNavigation = (page) => {
-    if (page === "dashboard") {
-      navigate("/dashboard");
-    } else if (page === "settings") {
-      navigate("/settings");
-    } else if (page.startsWith("reports/")) {
-      navigate(`/${page}`);
-    } else {
-      navigate(`/${page}`);
-    }
-  };
-
-  const isActive = (page) => {
-    if (page === "dashboard" && location.pathname === "/dashboard") return true;
-    if (page === "settings" && location.pathname === "/settings") return true;
-    if (page.startsWith("reports/") && location.pathname.includes(page)) return true;
-    return false;
   };
 
   return (

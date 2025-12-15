@@ -27,8 +27,8 @@ export default function ProfitLoss() {
   const [selectedYear, setSelectedYear] = useState(dayjs().year());
   const [societyInfo, setSocietyInfo] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const [, setError] = useState(null);
+  const [, setRefreshing] = useState(false);
 
   const formatCurrency = (value) =>
     new Intl.NumberFormat("en-IN", {
@@ -210,7 +210,7 @@ export default function ProfitLoss() {
 
   if (loading) {
     return (
-      <div className="p-6">
+      <div className="px-4 sm:px-6 py-6">
         <Skeleton className="h-10 w-full mb-4" />
         <Skeleton className="h-10 w-full mb-4" />
         <Skeleton className="h-10 w-full mb-4" />
@@ -220,10 +220,10 @@ export default function ProfitLoss() {
   }
 
   return (
-    <div className="p-6">
+    <div className="px-4 sm:px-6 py-6">
       {/* Export Button */}
-      <div className="ml-4 flex gap-2 print-hide">
-        <Button variant="outline" onClick={exportToPDF} className="gap-2">
+      <div className="flex gap-2 mb-4 print-hide">
+        <Button variant="outline" onClick={exportToPDF} className="gap-2 w-full sm:w-auto">
           <Download className="w-4 h-4" /> Export PDF
         </Button>
       </div>
@@ -231,7 +231,7 @@ export default function ProfitLoss() {
       {/* Header */}
       <div ref={printRef}>
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold">नफा तोटा पत्रक</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">नफा तोटा पत्रक</h1>
           <p className="mt-2 font-semibold">{societyInfo?.name}</p>
           <p>
             ता: {societyInfo?.taluka}, जि: {societyInfo?.district}
@@ -243,7 +243,7 @@ export default function ProfitLoss() {
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="border px-2 py-1 rounded"
+              className="border px-2 py-1 rounded w-full sm:w-auto"
             >
               {years.map((fy) => (
                 <option key={fy} value={parseInt(fy.split("-")[0], 10)}>
@@ -255,18 +255,18 @@ export default function ProfitLoss() {
         </div>
 
         {/* Two Column Table (Like Screenshot) */}
-        <div className="border-2 border-gray-300 shadow-lg overflow-hidden">
-          <Table>
+        <div className="border-2 border-gray-300 shadow-lg overflow-x-auto -mx-4 sm:mx-0">
+          <Table className="min-w-[640px] sm:min-w-full text-xs sm:text-sm">
             <TableHeader>
               <TableRow>
-                <TableHead className="text-center font-bold">
+                <TableHead className="text-center font-bold p-2 sm:p-3">
                   तपशील जमा (Credit)
                 </TableHead>
-                <TableHead className="text-center font-bold">रक्कम</TableHead>
-                <TableHead className="text-center font-bold">
+                <TableHead className="text-center font-bold p-2 sm:p-3">रक्कम</TableHead>
+                <TableHead className="text-center font-bold p-2 sm:p-3">
                   तपशील खर्च (Debit)
                 </TableHead>
-                <TableHead className="text-center font-bold">रक्कम</TableHead>
+                <TableHead className="text-center font-bold p-2 sm:p-3">रक्कम</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -276,18 +276,18 @@ export default function ProfitLoss() {
                 },
                 (_, i) => (
                   <TableRow key={i}>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center p-2 sm:p-3">
                       {incomeEntries[i]?.accountHead || ""}
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center p-2 sm:p-3">
                       {incomeEntries[i]
                         ? formatCurrency(incomeEntries[i].amount)
                         : ""}
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center p-2 sm:p-3">
                       {expenseEntries[i]?.accountHead || ""}
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center p-2 sm:p-3">
                       {expenseEntries[i]
                         ? formatCurrency(expenseEntries[i].amount)
                         : ""}
@@ -297,29 +297,29 @@ export default function ProfitLoss() {
               )}
 
               {/* Nafa/Tota Calculation */}
-              <TableRow className="font-bold bg-gray-200">
-                <TableCell className="text-center">
+              <TableRow className="font-bold bg-gray-200 text-xs sm:text-sm">
+                <TableCell className="text-center p-2 sm:p-3">
                   {isProfit ? "" : "तोटा"}
                 </TableCell>
-                <TableCell className="text-center">
+                <TableCell className="text-center p-2 sm:p-3">
                   {isProfit ? "" : formatCurrency(balancingAmount)}
                 </TableCell>
-                <TableCell className="text-center">
+                <TableCell className="text-center p-2 sm:p-3">
                   {isProfit ? "नफा" : ""}
                 </TableCell>
-                <TableCell className="text-center">
+                <TableCell className="text-center p-2 sm:p-3">
                   {isProfit ? formatCurrency(balancingAmount) : ""}
                 </TableCell>
               </TableRow>
 
               {/* Final Ekun */}
-              <TableRow className="font-bold bg-gray-300">
-                <TableCell className="text-center">एकूण</TableCell>
-                <TableCell className="text-center">
+              <TableRow className="font-bold bg-gray-300 text-xs sm:text-sm">
+                <TableCell className="text-center p-2 sm:p-3">एकूण</TableCell>
+                <TableCell className="text-center p-2 sm:p-3">
                   {formatCurrency(incomeTotalWithBalance)}
                 </TableCell>
-                <TableCell className="text-center">एकूण</TableCell>
-                <TableCell className="text-center">
+                <TableCell className="text-center p-2 sm:p-3">एकूण</TableCell>
+                <TableCell className="text-center p-2 sm:p-3">
                   {formatCurrency(expenseTotalWithBalance)}
                 </TableCell>
               </TableRow>

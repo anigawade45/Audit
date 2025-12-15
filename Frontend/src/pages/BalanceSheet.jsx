@@ -27,8 +27,8 @@ export default function BalanceSheet() {
   const [selectedYear, setSelectedYear] = useState(dayjs().year());
   const [societyInfo, setSocietyInfo] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const [, setError] = useState(null);
+  const [, setRefreshing] = useState(false);
 
   const formatCurrency = (value) =>
     new Intl.NumberFormat("en-IN", {
@@ -210,7 +210,7 @@ export default function BalanceSheet() {
 
   if (loading) {
     return (
-      <div className="p-6">
+      <div className="px-4 sm:px-6 py-6">
         <Skeleton className="h-10 w-full mb-4" />
         <Skeleton className="h-10 w-full mb-4" />
         <Skeleton className="h-10 w-full mb-4" />
@@ -220,10 +220,10 @@ export default function BalanceSheet() {
   }
 
   return (
-    <div className="p-6">
+    <div className="px-4 sm:px-6 py-6">
       {/* Export Button */}
-      <div className="ml-4 flex gap-2 print-hide">
-        <Button variant="outline" onClick={exportToPDF} className="gap-2">
+      <div className="flex gap-2 mb-4 print-hide">
+        <Button variant="outline" onClick={exportToPDF} className="gap-2 w-full sm:w-auto">
           <Download className="w-4 h-4" /> Export PDF
         </Button>
       </div>
@@ -231,7 +231,7 @@ export default function BalanceSheet() {
       {/* Header */}
       <div ref={printRef}>
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold">ताळेबंद</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">ताळेबंद</h1>
           <p className="mt-2 font-semibold">{societyInfo?.name}</p>
           <p>
             ता: {societyInfo?.taluka}, जि: {societyInfo?.district}
@@ -243,7 +243,7 @@ export default function BalanceSheet() {
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="border px-2 py-1 rounded"
+              className="border px-2 py-1 rounded w-full sm:w-auto"
             >
               {years.map((fy) => (
                 <option key={fy} value={parseInt(fy.split("-")[0], 10)}>
@@ -255,8 +255,8 @@ export default function BalanceSheet() {
         </div>
 
         {/* Two Column Table (Like Screenshot) */}
-        <div className="border-2 border-gray-300 shadow-lg overflow-hidden">
-          <Table>
+        <div className="border-2 border-gray-300 shadow-lg overflow-x-auto -mx-4 sm:mx-0">
+          <Table className="min-w-[640px] sm:min-w-full">
             <TableHeader>
               <TableRow>
                 <TableHead className="text-center font-bold">

@@ -233,7 +233,7 @@ export default function TrialBalance() {
     fetchMappings();
   }, [id, token, selectedYear]);
 
-  const handleMapping = async (entryName, value, isDebit) => {
+  const handleMapping = async (entryName, value) => {
     setMappings((prev) => ({ ...prev, [entryName]: value }));
 
     if (!value || !id || !token || !selectedYear) return;
@@ -371,16 +371,16 @@ export default function TrialBalance() {
   });
 
   return (
-    <div className="p-6">
-      <div className="ml-4 flex gap-2">
-        <Button variant="outline" onClick={exportToPDF} className="gap-2">
+    <div className="px-4 sm:px-6 py-6">
+      <div className="flex gap-2 mb-4">
+        <Button variant="outline" onClick={exportToPDF} className="gap-2 w-full sm:w-auto">
           <Download className="w-4 h-4" /> Export PDF
         </Button>
       </div>
       {/* Header */}
       <div ref={printRef}>
         <div className="text-center mb-6">
-          <h1 className="text-4xl font-bold mt-5 print-hide">तेरीज पत्रक</h1>
+          <h1 className="text-2xl sm:text-4xl font-bold mt-5 print-hide">तेरीज पत्रक</h1>
           <div className="p-3 text-center">
             {" "}
             <p className="text-lg font-semibold">{societyInfo?.name},</p>{" "}
@@ -403,7 +403,7 @@ export default function TrialBalance() {
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="border px-2 py-1 rounded"
+              className="border px-2 py-1 rounded w-full sm:w-auto"
             >
               {years.map((fy) => (
                 <option key={fy} value={parseInt(fy.split("-")[0], 10)}>
@@ -415,31 +415,31 @@ export default function TrialBalance() {
         </div>
 
         {/* Table */}
-        <div className="border-2 border-gray-200 shadow-lg overflow-hidden">
-          <Table className="border-collapse w-full">
+        <div className="border-2 border-gray-200 shadow-lg overflow-x-auto -mx-4 sm:mx-0">
+          <Table className="border-collapse min-w-[640px] sm:min-w-full text-xs sm:text-sm">
             <TableHeader>
               <TableRow>
-                <TableHead className="text-center text-black font-bold text-lg py-4 border-r border-gray-200">
+                <TableHead className="text-center text-black font-bold p-2 sm:p-3 border-r border-gray-200">
                   तपशील जमा
                 </TableHead>
-                <TableHead className="text-center text-black font-bold text-lg py-4 border-r border-gray-200">
+                <TableHead className="text-center text-black font-bold p-2 sm:p-3 border-r border-gray-200">
                   रक्कम
                 </TableHead>
-                <TableHead className="text-center text-black font-bold text-lg py-4 border-r border-gray-200">
+                <TableHead className="text-center text-black font-bold p-2 sm:p-3 border-r border-gray-200">
                   तपशील खर्च
                 </TableHead>
-                <TableHead className="text-center text-black font-bold text-lg py-4">
+                <TableHead className="text-center text-black font-bold p-2 sm:p-3">
                   रक्कम
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {/* Opening Balance Row */}
-              <TableRow className="font-bold bg-gray-50 hover:bg-gary-100 transition-colors">
-                <TableCell className="font-semibold text-gray-800 border-r border-gray-200 py-3">
+              <TableRow className="font-bold bg-gray-50 hover:bg-gary-100 transition-colors text-xs sm:text-sm">
+                <TableCell className="font-semibold text-gray-800 border-r border-gray-200 p-2 sm:p-3">
                   आरंभी शिल्लक
                 </TableCell>
-                <TableCell className="text-center font-semibold text-green-600 border-r border-gray-200 py-3">
+                <TableCell className="text-center font-semibold text-green-600 border-r border-gray-200 p-2 sm:p-3">
                   ₹ {openingBalance.toLocaleString()}
                 </TableCell>
                 <TableCell className="border-r border-gray-200"></TableCell>
@@ -459,17 +459,17 @@ export default function TrialBalance() {
                       className="hover:bg-gray-50 transition-colors"
                     >
                       {/* Debit Side */}
-                      <TableCell className="border-r border-gray-200 py-2">
+                      <TableCell className="border-r border-gray-200 p-2 sm:p-3 align-top">
                         {d?.accountHeadDetails?.name || ""}
                         {d && d.accountHeadDetails?.name !== "आरंभी शिल्लक" && (
                           <select
-                            className="ml-2 border px-1 py-0.5 rounded print-hide"
+                            className="mt-1 sm:mt-0 ml-0 sm:ml-2 border px-1 py-0.5 rounded print-hide w-full sm:w-auto"
                             value={mappings[d.accountHeadDetails.name] || ""}
                             onChange={(e) =>
                               handleMapping(
                                 d.accountHeadDetails.name,
                                 e.target.value,
-                                true
+                                /* removed isDebit */
                               )
                             }
                           >
@@ -482,22 +482,22 @@ export default function TrialBalance() {
                           </select>
                         )}
                       </TableCell>
-                      <TableCell className="text-center border-r border-gray-200 py-2">
+                      <TableCell className="text-center border-r border-gray-200 p-2 sm:p-3">
                         {d ? `₹ ${d.totalDebit?.toLocaleString?.() || ""}` : ""}
                       </TableCell>
 
                       {/* Credit Side */}
-                      <TableCell className="border-r border-gray-200 py-2">
+                      <TableCell className="border-r border-gray-200 p-2 sm:p-3 align-top">
                         {c?.accountHeadDetails?.name || ""}
                         {c && c.accountHeadDetails?.name !== "अखेरी शिल्लक" && (
                           <select
-                            className="ml-2 border px-1 py-0.5 rounded print-hide"
+                            className="mt-1 sm:mt-0 ml-0 sm:ml-2 border px-1 py-0.5 rounded print-hide w-full sm:w-auto"
                             value={mappings[c.accountHeadDetails.name] || ""}
                             onChange={(e) =>
                               handleMapping(
                                 c.accountHeadDetails.name,
                                 e.target.value,
-                                false
+                                /* removed isDebit */
                               )
                             }
                           >
@@ -510,7 +510,7 @@ export default function TrialBalance() {
                           </select>
                         )}
                       </TableCell>
-                      <TableCell className="text-center py-2">
+                      <TableCell className="text-center p-2 sm:p-3">
                         {c
                           ? `₹ ${c.totalCredit?.toLocaleString?.() || ""}`
                           : ""}
@@ -521,29 +521,29 @@ export default function TrialBalance() {
               })()}
 
               {/* Closing Balance Row */}
-              <TableRow className="font-bold bg-gray-50 hover:bg-gray-100 transition-colors">
+              <TableRow className="font-bold bg-gray-50 hover:bg-gray-100 transition-colors text-xs sm:text-sm">
                 <TableCell className="border-r border-gray-200"></TableCell>
                 <TableCell className="border-r border-gray-200"></TableCell>
-                <TableCell className="font-semibold text-gray-800 border-r border-gray-200 py-3">
+                <TableCell className="font-semibold text-gray-800 border-r border-gray-200 p-2 sm:p-3">
                   अखेरी शिल्लक
                 </TableCell>
-                <TableCell className="text-center font-semibold text-green-600 py-3">
+                <TableCell className="text-center font-semibold text-green-600 p-2 sm:p-3">
                   ₹ {closingBalance.toLocaleString()}
                 </TableCell>
               </TableRow>
 
               {/* Totals */}
-              <TableRow className="font-bold bg-gray-100 hover:bg-gray-200 transition-colors">
-                <TableCell className="font-semibold text-gray-800 border-r border-gray-300 py-3">
+              <TableRow className="font-bold bg-gray-100 hover:bg-gray-200 transition-colors text-xs sm:text-sm">
+                <TableCell className="font-semibold text-gray-800 border-r border-gray-300 p-2 sm:p-3">
                   एकूण
                 </TableCell>
-                <TableCell className="text-center font-semibold text-gray-700 border-r border-gray-300 py-3">
+                <TableCell className="text-center font-semibold text-gray-700 border-r border-gray-300 p-2 sm:p-3">
                   ₹ {totalDebit.toLocaleString()}
                 </TableCell>
-                <TableCell className="font-semibold text-gray-800 border-r border-gray-300 py-3">
+                <TableCell className="font-semibold text-gray-800 border-r border-gray-300 p-2 sm:p-3">
                   एकूण
                 </TableCell>
-                <TableCell className="text-center font-semibold text-gray-700 py-3">
+                <TableCell className="text-center font-semibold text-gray-700 p-2 sm:p-3">
                   ₹ {totalCredit.toLocaleString()}
                 </TableCell>
               </TableRow>
