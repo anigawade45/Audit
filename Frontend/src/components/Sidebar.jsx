@@ -17,8 +17,8 @@ import { toast } from "sonner";
 import PropTypes from "prop-types";
 
 const AppSidebar = () => {
-  const [isOpen, setIsOpen] = useState(true);
-  const { setToken } = useContext(AuthContext);
+  const [isOpen, setIsOpen] = useState(() => (typeof window !== "undefined" ? window.innerWidth >= 640 : true));
+  const { logout } = useContext(AuthContext);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -53,8 +53,7 @@ const AppSidebar = () => {
   }, [isReportRoute, societyId]);
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    setToken(null);
+    logout();
     toast.success("Logged out successfully");
     navigate("/login");
   };

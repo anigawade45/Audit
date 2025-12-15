@@ -23,7 +23,7 @@ const AppRoutes = () => {
   // Dashboard layout wrapper
   const DashboardLayout = ({ children }) => (
     <div className="min-h-screen flex">
-      <aside className="w-0 md:w-64 flex-shrink-0">
+      <aside className="w-20 sm:w-64 flex-shrink-0">
         <AppSidebar />
       </aside>
       <div className="flex flex-col flex-1">
