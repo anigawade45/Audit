@@ -112,6 +112,13 @@ export default function CashBook() {
     }
   };
 
+  const cancelDeleteMode = () => {
+  setDeleteMode(false);
+  setSelectedIds([]);
+  setShowConfirm(false);
+};
+
+
   const [selectedFiscalYear, setSelectedFiscalYear] = useState("");
 
   const getCurrentFiscalYear = () => {
@@ -462,6 +469,16 @@ useEffect(() => {
     localStorage.setItem("debitHeads", JSON.stringify(debitHeadsList));
   }, [debitHeadsList]);
 
+  const fiscalYearDisplay = useMemo(() => {
+  if (!selectedFiscalYear) return null;
+
+  const start = parseInt(selectedFiscalYear.split("-")[0], 10);
+  return {
+    start,
+    end: start + 1,
+  };
+}, [selectedFiscalYear]);
+
   useEffect(() => {
     localStorage.setItem("creditHeads", JSON.stringify(creditHeadsList));
   }, [creditHeadsList]);
@@ -484,17 +501,54 @@ useEffect(() => {
   });
 
   return (
+    
     <div className="px-4 sm:px-6 py-6">
+       <div className="sm:ml-4 flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={exportToPDF} className="gap-2 w-full sm:w-auto">
+            <Download className="w-4 h-4" /> Export PDF
+          </Button>
+          {!deleteMode ? (
+  <Button
+    variant="outline"
+    onClick={() => setDeleteMode(true)}
+    className="gap-2"
+  >
+    <Trash2 className="w-4 h-4" />
+    Delete Entry
+  </Button>
+) : (
+  <div className="flex gap-2">
+    <Button
+      variant="destructive"
+      onClick={() => setShowConfirm(true)}
+      className="gap-2"
+    >
+      <Trash2 className="w-4 h-4" />
+      Confirm Delete
+    </Button>
+
+    <Button
+      variant="outline"
+      onClick={cancelDeleteMode}
+    >
+      Cancel
+    </Button>
+  </div>
+)}
+
+        </div>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
         <div className="w-full text-center">
-          <h1 className="text-2xl sm:text-4xl font-bold">रोजकिर्द</h1>
+          <h1 className="text-2xl sm:text-4xl font-bold">
+            रोजकिर्द
+          </h1>
           <div className="mt-4 text-semibold">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
               <label className="sm:mr-2">वर्ष (Year):</label>
               <Select
   value={selectedFiscalYear}
   onValueChange={setSelectedFiscalYear}
->
+              >
 
                 <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="वर्ष निवडा" />
@@ -509,22 +563,7 @@ useEffect(() => {
               </Select>
             </div>
           </div>
-        </div>
-        <div className="sm:ml-4 flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <Button variant="outline" onClick={exportToPDF} className="gap-2 w-full sm:w-auto">
-            <Download className="w-4 h-4" /> Export PDF
-          </Button>
-          <Button
-            variant={deleteMode ? "destructive" : "outline"}
-            onClick={() =>
-              deleteMode ? setShowConfirm(true) : setDeleteMode((prev) => !prev)
-            }
-            className="gap-2 w-full sm:w-auto"
-          >
-            <Trash2 className="w-4 h-4" />
-            {deleteMode ? "Confirm Delete" : "Delete"}
-          </Button>
-        </div>
+        </div> 
       </div>
       <Card className="mb-6">
         <CardHeader>
@@ -667,15 +706,23 @@ useEffect(() => {
       <div ref={printRef}>
         <div className="p-3 text-center">
           {" "}
-          <p className="text-xl font-medium">{societyInfo?.name},</p>{" "}
+          <p className="text-lg font-semibold">{societyInfo?.name},</p>{" "}
           <p>
             {" "}
-            <span className="text-xl font-medium">
+            <span className="text-lg font-semibold">
               {" "}
               ता: {societyInfo?.taluka}, जि: {societyInfo?.district}{" "}
             </span>{" "}
           </p>{" "}
-          <p className="mt-3 text-lg font-bold">रोजकिर्द</p>{" "}
+         {fiscalYearDisplay && (
+  <p className="mt-2 text-lg font-bold">
+    रोजकिर्द :{" "}
+    <span className="text-lg font-medium">
+      {fiscalYearDisplay.start} ते {fiscalYearDisplay.end}
+    </span>
+  </p>
+)}
+
         </div>
         <Card>
           <CardContent className="p-0 overflow-x-auto -mx-4 sm:mx-0">
