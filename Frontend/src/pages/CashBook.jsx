@@ -112,7 +112,20 @@ export default function CashBook() {
     }
   };
 
-  const fiscalLabelFromDate = (iso) => {
+  const [selectedFiscalYear, setSelectedFiscalYear] = useState("");
+
+  const getCurrentFiscalYear = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+
+  if (month <= 3) {
+    return `${year - 1}-${String(year).slice(-2)}`;
+  }
+  return `${year}-${String(year + 1).slice(-2)}`;
+};
+
+const fiscalLabelFromDate = (iso) => {
     if (!iso) return "";
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return "";
@@ -124,19 +137,6 @@ export default function CashBook() {
     const endYear = startYear + 1;
     return `${startYear}-${String(endYear).slice(-2)}`;
   };
-
-  const fiscalRangeFromLabel = (label) => {
-    const parts = label.split("-");
-    if (parts.length < 2) return null;
-    const startYear = parseInt(parts[0], 10);
-    const endYear = startYear + 1;
-    return {
-      start: `${startYear}-04-01`,
-      end: `${endYear}-03-31`,
-    };
-  };
-
-  const [selectedFiscalYear, setSelectedFiscalYear] = useState("");
 
   const fiscalOptions = useMemo(() => {
     const availableYears = new Set();
@@ -154,59 +154,111 @@ export default function CashBook() {
     });
   }, [entries]);
 
-  useEffect(() => {
-    const fetchSociety = async () => {
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/societies/${id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const s = res?.data?.society || res?.data;
-        setSocietyInfo(s);
-        if (s?.currentYear) {
-          setSelectedFiscalYear(s.currentYear);
-        } else if (s?.financialYearStart) {
-          setSelectedFiscalYear(fiscalLabelFromDate(s.financialYearStart));
-        }
-        console.log("Fetched society info:", s);
-      } catch (err) {
-        console.error("Failed to fetch society:", err);
-      }
+const hasEntriesForYear = (fy) => fiscalOptions.includes(fy);
+const isDataReady = societyInfo !== null && entries.length > 0;
+
+useEffect(() => {
+  // ❗ Do nothing until data is ready
+  if (!isDataReady) return;
+
+  // ❗ Do not override user/manual selection
+  if (selectedFiscalYear) return;
+
+  // 1️⃣ Society current year ONLY if entries exist
+  if (
+    societyInfo?.currentYear &&
+    fiscalOptions.includes(societyInfo.currentYear)
+  ) {
+    setSelectedFiscalYear(societyInfo.currentYear);
+    return;
+  }
+
+  // 2️⃣ FIRST year of society (earliest entry year) ✅
+  if (fiscalOptions.length > 0) {
+    setSelectedFiscalYear(fiscalOptions[fiscalOptions.length - 1]);
+    return;
+  }
+
+  // 3️⃣ Society financial start
+  if (societyInfo?.financialYearStart) {
+    setSelectedFiscalYear(
+      fiscalLabelFromDate(societyInfo.financialYearStart)
+    );
+    return;
+  }
+
+  // 4️⃣ Final fallback (ONLY after everything else fails)
+  setSelectedFiscalYear(getCurrentFiscalYear());
+
+}, [
+  isDataReady,
+  selectedFiscalYear,
+  fiscalOptions,
+  societyInfo,
+]);
+
+  const fiscalRangeFromLabel = (label) => {
+    const parts = label.split("-");
+    if (parts.length < 2) return null;
+    const startYear = parseInt(parts[0], 10);
+    const endYear = startYear + 1;
+    return {
+      start: `${startYear}-04-01`,
+      end: `${endYear}-03-31`,
     };
-    if (id && token) fetchSociety();
-  }, [id, token]);
+  };
+
+useEffect(() => {
+  const fetchSociety = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/societies/${id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const s = res?.data?.society || res?.data;
+      setSocietyInfo(s);
+
+    } catch (err) {
+      console.error("Failed to fetch society:", err);
+    }
+  };
+
+  if (id && token) fetchSociety();
+}, [id, token]);
 
   useEffect(() => {
-    const fetchEntries = async () => {
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/cashbook/${id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+  const fetchEntries = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/cashbook/${id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-        const list = Array.isArray(res.data)
-          ? res.data
-          : res.data?.entries || [];
-        setEntries(
-          list.map((e) => ({
-            _id: e._id,
-            date: (e.date || "").split("T")[0],
-            type: String(e.type || "").toLowerCase(),
-            accountHead:
-              e.accountHeadName || e.accountHead?.name || e.accountHead,
-            description: e.description,
-            amount: Number(e.amount) || 0,
-          }))
-        );
-      } catch (err) {
-        console.error("Fetch Entries Error:", err);
-        setEntries([]);
-        toast.error("Failed to fetch cashbook entries. Please try again.");
-      }
-    };
+      const list = Array.isArray(res.data)
+        ? res.data
+        : res.data?.entries || [];
 
-    fetchEntries();
-  }, [id, selectedFiscalYear, token]);
+      setEntries(
+        list.map((e) => ({
+          _id: e._id,
+          date: (e.date || "").split("T")[0],
+          type: String(e.type || "").toLowerCase(),
+          accountHead:
+            e.accountHeadName || e.accountHead?.name || e.accountHead,
+          description: e.description,
+          amount: Number(e.amount) || 0,
+        }))
+      );
+    } catch (err) {
+      console.error("Fetch Entries Error:", err);
+      setEntries([]);
+      toast.error("Failed to fetch cashbook entries.");
+    }
+  };
+
+  if (id && token) fetchEntries();
+}, [id, token]);
 
   useEffect(() => {
     const fetchAccountHeads = async () => {
@@ -440,9 +492,10 @@ export default function CashBook() {
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
               <label className="sm:mr-2">वर्ष (Year):</label>
               <Select
-                value={selectedFiscalYear}
-                onValueChange={(val) => setSelectedFiscalYear(val)}
-              >
+  value={selectedFiscalYear}
+  onValueChange={setSelectedFiscalYear}
+>
+
                 <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="वर्ष निवडा" />
                 </SelectTrigger>
