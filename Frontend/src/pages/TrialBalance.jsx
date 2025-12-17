@@ -393,8 +393,8 @@ export default function TrialBalance() {
             </p>{" "}
             <p className="mt-2 text-lg font-bold">
               तेरिज पत्रक : {"    "}
-              <span className="text-lg font-medium">
-                {selectedYear} {"   "}  ते  {"   "} {selectedYear + 1}
+              <span className="text-lg font-normal">
+                सन {selectedYear} {"   "}  -  {"   "} {String(selectedYear + 1).slice(-2)}
               </span>
             </p>
           </div>

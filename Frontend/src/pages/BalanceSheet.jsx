@@ -236,9 +236,10 @@ export default function BalanceSheet() {
           <p>
             ता: {societyInfo?.taluka}, जि: {societyInfo?.district}
           </p>
-          <p className="mt-2 font-bold">
-            {selectedYear} ते {selectedYear + 1}
-          </p>
+          <p className="mt-2 font-normal">
+  सन {selectedYear}-{String(selectedYear + 1).slice(-2)}
+</p>
+
           <div className="mt-3 print-hide">
             <select
               value={selectedYear}

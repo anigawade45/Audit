@@ -716,9 +716,9 @@ useEffect(() => {
           </p>{" "}
          {fiscalYearDisplay && (
   <p className="mt-2 text-lg font-bold">
-    रोजकिर्द :{" "}
-    <span className="text-lg font-medium">
-      {fiscalYearDisplay.start} ते {fiscalYearDisplay.end}
+    रोजकिर्द : {" "}
+    <span className="text-lg font-normal">
+     सन {fiscalYearDisplay.start} - {String(fiscalYearDisplay.end).slice(-2)}
     </span>
   </p>
 )}
