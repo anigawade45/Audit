@@ -47,6 +47,11 @@ const login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
+        if (!process.env.JWT_SECRET) {
+            console.error("Missing JWT_SECRET environment variable");
+            return res.status(500).json({ message: "Server misconfigured: JWT secret not set" });
+        }
+
         // Find user by email
         const user = await User.findOne({ email });
         if (!user) {

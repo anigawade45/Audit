@@ -9,6 +9,10 @@ const requireAuth = async (req, res, next) => {
     }
 
     try {
+        if (!process.env.JWT_SECRET) {
+            console.error("Missing JWT_SECRET environment variable");
+            return res.status(500).json({ message: "Server misconfigured: JWT secret not set" });
+        }
         const token = authHeader.split(" ")[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
