@@ -161,7 +161,6 @@ const fiscalLabelFromDate = (iso) => {
     });
   }, [entries]);
 
-const hasEntriesForYear = (fy) => fiscalOptions.includes(fy);
 const isDataReady = societyInfo !== null && entries.length > 0;
 
 useEffect(() => {

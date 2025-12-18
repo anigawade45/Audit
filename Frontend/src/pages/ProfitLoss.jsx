@@ -93,6 +93,8 @@ export default function ProfitLoss() {
     if (id && token) fetchYears();
   }, [id, token]);
 
+
+
   // fetch profit loss data
   useEffect(() => {
     const fetchProfitLoss = async () => {
@@ -277,7 +279,7 @@ export default function ProfitLoss() {
                 (_, i) => (
                   <TableRow key={i}>
                     <TableCell className="text-center p-2 sm:p-3">
-                      {incomeEntries[i]?.accountHead || ""}
+                      {incomeEntries[i]?.accountHeadName || ""}
                     </TableCell>
                     <TableCell className="text-center p-2 sm:p-3">
                       {incomeEntries[i]
@@ -285,7 +287,7 @@ export default function ProfitLoss() {
                         : ""}
                     </TableCell>
                     <TableCell className="text-center p-2 sm:p-3">
-                      {expenseEntries[i]?.accountHead || ""}
+                      {expenseEntries[i]?.accountHeadName || ""}
                     </TableCell>
                     <TableCell className="text-center p-2 sm:p-3">
                       {expenseEntries[i]

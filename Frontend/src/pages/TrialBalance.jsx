@@ -4,7 +4,7 @@ import axios from "axios";
 import dayjs from "dayjs";
 import { AuthContext } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { Download, CheckCircle, Lock } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import {
   Table,
@@ -14,6 +14,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function TrialBalance() {
   const { id } = useParams();
@@ -135,32 +140,15 @@ export default function TrialBalance() {
           ? res.data.trialBalance
           : [];
 
-        const normalized = rows.map((it, idx) => {
-          const debit = it.debit || 0;
-          const credit = it.credit || 0;
-          let name = it.accountHeadName || "";
-          let type = debit > 0 ? "Debit" : "Credit";
+        const normalized = rows.map((it, idx) => ({
+          accountHeadId: it.accountHeadId || `row-${idx}`,
+          accountHeadName: it.accountHeadName || "",
+          debit: it.debit || 0,
+          credit: it.credit || 0,
+        }));
 
-          if (name === "आरंभी शिल्लक") type = "Debit";
-          if (name === "अखेरी शिल्लक") type = "Credit";
-
-          return {
-            _id: it.accountHeadId || it.accountHeadName || `row-${idx}`,
-            totalDebit: debit,
-            totalCredit: credit,
-            accountHeadDetails: {
-              name: name,
-              type,
-            },
-          };
-        });
-
-        setDebitHeads(
-          normalized.filter((t) => t.accountHeadDetails?.type === "Debit")
-        );
-        setCreditHeads(
-          normalized.filter((t) => t.accountHeadDetails?.type === "Credit")
-        );
+        setDebitHeads(normalized.filter((t) => (t.debit || 0) > 0));
+        setCreditHeads(normalized.filter((t) => (t.credit || 0) > 0));
       } catch (err) {
         console.error("Error fetching trial balance:", err);
       }
@@ -221,10 +209,16 @@ export default function TrialBalance() {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const data = res.data?.data?.mappings || {};
-        const flat = Object.fromEntries(
-          Object.entries(data).map(([k, v]) => [k, v?.reportType || ""])
+        const detail = Object.fromEntries(
+          Object.entries(data).map(([k, v]) => [
+            k,
+            {
+              reportType: v?.reportType || "",
+              side: v?.side || "",
+            },
+          ])
         );
-        setMappings(flat);
+        setMappings(detail);
       } catch (err) {
         console.error("Failed to fetch saved mappings:", err);
       }
@@ -233,10 +227,29 @@ export default function TrialBalance() {
     fetchMappings();
   }, [id, token, selectedYear]);
 
-  const handleMapping = async (entryName, value) => {
-    setMappings((prev) => ({ ...prev, [entryName]: value }));
+  const handleMapping = async (compositeKey, value, side) => {
+    const prev = mappings[compositeKey];
+    const headers = { Authorization: `Bearer ${token}` };
+    if (!id || !token || !selectedYear) return;
 
-    if (!value || !id || !token || !selectedYear) return;
+    if (value === "__remove__" || value == null) {
+      setMappings((prevState) => {
+        const next = { ...prevState };
+        delete next[compositeKey];
+        return next;
+      });
+      try {
+        await axios.post(
+          `${import.meta.env.VITE_BACKEND_URL}/api/reports/mapping/remove/${id}`,
+          { year: selectedYear, accountHeadId: compositeKey.split(":")[0], side },
+          { headers }
+        );
+      } catch (err) {
+        console.error("Error removing mapping:", err);
+        setMappings((prevState) => ({ ...prevState, [compositeKey]: prev }));
+      }
+      return;
+    }
 
     const routeByType = {
       profitLoss: "profit-loss",
@@ -246,37 +259,28 @@ export default function TrialBalance() {
     const route = routeByType[value];
     if (!route) return;
 
-    // Find the account head (check both debit and credit arrays)
-    const accountHead =
-      debitHeads.find((d) => d.accountHeadDetails?.name === entryName) ||
-      creditHeads.find((c) => c.accountHeadDetails?.name === entryName);
-
-    const totalAmount =
-      accountHead?.totalDebit || accountHead?.totalCredit || 0;
-
-    // ✅ Use actual type, not just isDebit flag
-    const side = accountHead?.accountHeadDetails?.type?.toLowerCase();
+    setMappings((prevState) => ({
+      ...prevState,
+      [compositeKey]: { reportType: value, side },
+    }));
 
     try {
       await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/api/reports/${route}/${id}`,
         {
           year: selectedYear,
-          mappings: {
-            [entryName]: {
-              reportType: value,
-              totalAmount,
-              side, // <-- fixed
-            },
-          },
+          accountHeadId: compositeKey.split(":")[0],
+          reportType: value,
+          side,
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers }
       );
     } catch (err) {
       console.error("Error saving mapping:", err);
-      setMappings((prev) => {
-        const next = { ...prev };
-        delete next[entryName];
+      setMappings((prevState) => {
+        const next = { ...prevState };
+        if (prev) next[compositeKey] = prev;
+        else delete next[compositeKey];
         return next;
       });
     }
@@ -285,13 +289,13 @@ export default function TrialBalance() {
   const totalDebit = useMemo(
     () =>
       openingBalance +
-      debitHeads.reduce((sum, h) => sum + (h.totalDebit || 0), 0),
+      debitHeads.reduce((sum, h) => sum + (h.debit || 0), 0),
     [debitHeads, openingBalance]
   );
   const totalCredit = useMemo(
     () =>
       closingBalance +
-      creditHeads.reduce((sum, h) => sum + (h.totalCredit || 0), 0),
+      creditHeads.reduce((sum, h) => sum + (h.credit || 0), 0),
     [creditHeads, closingBalance]
   );
 
@@ -459,60 +463,180 @@ export default function TrialBalance() {
                     >
                       {/* Debit Side */}
                       <TableCell className="border-r border-gray-200 p-2 sm:p-3 align-top">
-                        {d?.accountHeadDetails?.name || ""}
-                        {d && d.accountHeadDetails?.name !== "आरंभी शिल्लक" && (
-                          <select
-                            className="mt-1 sm:mt-0 ml-0 sm:ml-2 border px-1 py-0.5 rounded print-hide w-full sm:w-auto"
-                            value={mappings[d.accountHeadDetails.name] || ""}
-                            onChange={(e) =>
-                              handleMapping(
-                                d.accountHeadDetails.name,
-                                e.target.value,
-                                /* removed isDebit */
-                              )
-                            }
-                          >
-                            <option value="">-- Select Mapping --</option>
-                            {options.map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
-                        )}
+                        {d?.accountHeadName || ""}
+                        {d && d.accountHeadName !== "आरंभी शिल्लक" && (() => {
+                          const key = `${d.accountHeadId}:debit`;
+                          const m = mappings[key];
+                          const isMapped = !!m?.reportType && m.side === "debit";
+                          const opp = mappings[`${d.accountHeadId}:credit`];
+                          const isAutoLocked = !!opp && opp.reportType === "balanceSheet";
+                          if (isMapped) {
+                            return (
+                              <div className="mt-1 sm:mt-0 ml-0 sm:ml-2 flex items-center gap-2 print-hide">
+                                <CheckCircle className="w-4 h-4 text-green-600" />
+                                <span className="text-xs sm:text-sm text-green-600">
+                                  {m.reportType === "balanceSheet" ? "Mapped to Balance Sheet (Debit)" : "Mapped to Profit & Loss"}
+                                </span>
+                                <select
+                                  className="ml-2 border px-1 py-0.5 rounded"
+                                  value={m?.reportType || ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === "__remove__") {
+                                      handleMapping(key, null, "debit");
+                                    } else {
+                                      handleMapping(key, val, "debit");
+                                    }
+                                  }}
+                                >
+                                  <option value="">-- Select Mapping --</option>
+                                  {options.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </option>
+                                  ))}
+                                  <option value="__remove__">Remove Mapping</option>
+                                </select>
+                              </div>
+                            );
+                          }
+                          if (isAutoLocked) {
+                            return (
+                              <div className="mt-1 sm:mt-0 ml-0 sm:ml-2 flex items-center gap-2 text-gray-500 print-hide">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Lock className="w-4 h-4" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    Auto-locked because opposite side is used for Balance Sheet calculation
+                                  </TooltipContent>
+                                </Tooltip>
+                                <span className="text-xs sm:text-sm">Auto-locked</span>
+                                <select
+                                  className="ml-2 border px-1 py-0.5 rounded opacity-50 cursor-not-allowed"
+                                  value=""
+                                  disabled
+                                >
+                                  <option value="">-- Select Mapping --</option>
+                                  {options.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            );
+                          }
+                          return (
+                            <select
+                              className="mt-1 sm:mt-0 ml-0 sm:ml-2 border px-1 py-0.5 rounded print-hide w-full sm:w-auto"
+                              value={m?.reportType || ""}
+                              onChange={(e) =>
+                                handleMapping(key, e.target.value, "debit", d.debit)
+                              }
+                            >
+                              <option value="">-- Select Mapping --</option>
+                              {options.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-center border-r border-gray-200 p-2 sm:p-3">
-                        {d ? `₹ ${d.totalDebit?.toLocaleString?.() || ""}` : ""}
+                        {d ? `₹ ${d.debit?.toLocaleString?.() || ""}` : ""}
                       </TableCell>
 
                       {/* Credit Side */}
                       <TableCell className="border-r border-gray-200 p-2 sm:p-3 align-top">
-                        {c?.accountHeadDetails?.name || ""}
-                        {c && c.accountHeadDetails?.name !== "अखेरी शिल्लक" && (
-                          <select
-                            className="mt-1 sm:mt-0 ml-0 sm:ml-2 border px-1 py-0.5 rounded print-hide w-full sm:w-auto"
-                            value={mappings[c.accountHeadDetails.name] || ""}
-                            onChange={(e) =>
-                              handleMapping(
-                                c.accountHeadDetails.name,
-                                e.target.value,
-                                /* removed isDebit */
-                              )
-                            }
-                          >
-                            <option value="">-- Select Mapping --</option>
-                            {options.map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
-                        )}
+                        {c?.accountHeadName || ""}
+                        {c && c.accountHeadName !== "अखेरी शिल्लक" && (() => {
+                          const key = `${c.accountHeadId}:credit`;
+                          const m = mappings[key];
+                          const isMapped = !!m?.reportType && m.side === "credit";
+                          const opp = mappings[`${c.accountHeadId}:debit`];
+                          const isAutoLocked = !!opp && opp.reportType === "balanceSheet";
+                          if (isMapped) {
+                            return (
+                              <div className="mt-1 sm:mt-0 ml-0 sm:ml-2 flex items-center gap-2 print-hide">
+                                <CheckCircle className="w-4 h-4 text-green-600" />
+                                <span className="text-xs sm:text-sm text-green-600">
+                                  {m.reportType === "balanceSheet" ? "Mapped to Balance Sheet (Credit)" : "Mapped to Profit & Loss"}
+                                </span>
+                                <select
+                                  className="ml-2 border px-1 py-0.5 rounded"
+                                  value={m?.reportType || ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === "__remove__") handleMapping(key, null, "credit");
+                                    else handleMapping(key, val, "credit");
+                                  }}
+                                >
+                                  <option value="">-- Select Mapping --</option>
+                                  {options.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </option>
+                                  ))}
+                                  <option value="__remove__">Remove Mapping</option>
+                                </select>
+                              </div>
+                            );
+                          }
+                          if (isAutoLocked) {
+                            return (
+                              <div className="mt-1 sm:mt-0 ml-0 sm:ml-2 flex items-center gap-2 text-gray-500 print-hide">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Lock className="w-4 h-4" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    Auto-locked because opposite side is used for Balance Sheet calculation
+                                  </TooltipContent>
+                                </Tooltip>
+                                <span className="text-xs sm:text-sm">Auto-locked</span>
+                                <select
+                                  className="ml-2 border px-1 py-0.5 rounded opacity-50 cursor-not-allowed"
+                                  value=""
+                                  disabled
+                                >
+                                  <option value="">-- Select Mapping --</option>
+                                  {options.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            );
+                          }
+                          return (
+                            <select
+                              className="mt-1 sm:mt-0 ml-0 sm:ml-2 border px-1 py-0.5 rounded print-hide w-full sm:w-auto"
+                              value={m?.reportType || ""}
+                              onChange={(e) =>
+                                handleMapping(
+                                  key,
+                                  e.target.value,
+                                  "credit",
+                                  c.credit
+                                )
+                              }
+                            >
+                              <option value="">-- Select Mapping --</option>
+                              {options.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-center p-2 sm:p-3">
-                        {c
-                          ? `₹ ${c.totalCredit?.toLocaleString?.() || ""}`
-                          : ""}
+                        {c ? `₹ ${c.credit?.toLocaleString?.() || ""}` : ""}
                       </TableCell>
                     </TableRow>
                   );

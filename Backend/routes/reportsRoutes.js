@@ -16,4 +16,7 @@ router.get("/balance-sheet-data/:societyId", requireAuth, reportController.getBa
 router.get("/trial-balance/:societyId", requireAuth, trialBalanceCtrl.getTrialBalance);
 router.get("/trial-balance/years/:societyId", requireAuth, trialBalanceCtrl.getAvailableYears);
 
+// Remove mapping (year + accountHeadId)
+router.post("/mapping/remove/:societyId", requireAuth, reportController.removeMapping);
+
 module.exports = router;
