@@ -33,6 +33,7 @@ import {
 import { Plus, Download, Trash2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 
 const debitHeads = [
   "सभासद जमा",
@@ -79,6 +80,7 @@ export default function CashBook() {
   const [deleteMode, setDeleteMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
@@ -291,6 +293,7 @@ useEffect(() => {
   }, [id, token]);
 
   const addEntry = async () => {
+    if (adding) return;
     if (
       !newEntry.amount ||
       (!newEntry.accountHead && !newEntry.customHead) ||
@@ -300,27 +303,26 @@ useEffect(() => {
       return;
     }
 
-    let accountToSave = newEntry.accountHead;
-    if (accountToSave === "__other__") {
-      accountToSave = newEntry.customHead.trim();
-
-      const response = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/account-heads/${id}`,
-        {
-          type: newEntry.type.charAt(0).toUpperCase() + newEntry.type.slice(1),
-          name: accountToSave,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      if (newEntry.type.toLowerCase() === "debit") {
-        setDebitHeadsList((prev) => [...prev, response.data.head.name]);
-      } else {
-        setCreditHeadsList((prev) => [...prev, response.data.head.name]);
-      }
-    }
-
+    setAdding(true);
     try {
+      let accountToSave = newEntry.accountHead;
+      if (accountToSave === "__other__") {
+        accountToSave = newEntry.customHead.trim();
+        const response = await axios.post(
+          `${import.meta.env.VITE_BACKEND_URL}/api/account-heads/${id}`,
+          {
+            type: newEntry.type.charAt(0).toUpperCase() + newEntry.type.slice(1),
+            name: accountToSave,
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (newEntry.type.toLowerCase() === "debit") {
+          setDebitHeadsList((prev) => [...prev, response.data.head.name]);
+        } else {
+          setCreditHeadsList((prev) => [...prev, response.data.head.name]);
+        }
+      }
+
       await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/api/cashbook/add/${id}`,
         {
@@ -366,6 +368,8 @@ useEffect(() => {
       const errorMsg =
         err.response?.data?.message || "Failed to add entry. Please try again.";
       toast.error(errorMsg);
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -516,15 +520,17 @@ useEffect(() => {
     Delete Entry
   </Button>
 ) : (
-  <div className="flex gap-2">
+  <div className="flex items-center gap-2">
     <Button
       variant="destructive"
       onClick={() => setShowConfirm(true)}
       className="gap-2"
+      disabled={selectedIds.length === 0}
     >
       <Trash2 className="w-4 h-4" />
       Confirm Delete
     </Button>
+    <Badge variant="outline">Selected {selectedIds.length}</Badge>
 
     <Button
       variant="outline"
@@ -695,10 +701,9 @@ useEffect(() => {
                 className="w-full"
               />{" "}
             </div>{" "}
-            <Button type="submit6" className="mt-4 gap-2 w-full sm:w-auto">
-              {" "}
-              <Plus className="w-4 h-4" /> Add Entry{" "}
-            </Button>{" "}
+            <Button type="submit" className="mt-4 gap-2 w-full sm:w-auto" disabled={adding} aria-busy={adding}>
+              {adding ? "Adding..." : (<><Plus className="w-4 h-4" /> Add Entry</>)}
+            </Button>
           </form>
         </CardContent>
       </Card>
@@ -739,7 +744,15 @@ useEffect(() => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {Object.values(dailyData).map((day) => {
+                {Object.values(dailyData).length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center p-4 text-sm text-muted-foreground">
+                      No entries for the selected year
+                    </TableCell>
+                  </TableRow>
+                )}
+                {Object.values(dailyData).length > 0 &&
+                Object.values(dailyData).map((day) => {
                   const debitSum = day.debitEntries.reduce(
                     (s, e) => s + (Number(e.amount) || 0),
                     0
@@ -771,7 +784,16 @@ useEffect(() => {
                             const d = day.debitEntries[idx];
                             const c = day.creditEntries[idx];
                             return (
-                              <TableRow key={`${day.date}-${idx}`}>
+                              <TableRow
+                                key={`${day.date}-${idx}`}
+                                className={
+                                  deleteMode &&
+                                  ((d && selectedIds.includes(d._id)) ||
+                                    (c && selectedIds.includes(c._id)))
+                                    ? "bg-yellow-50"
+                                    : ""
+                                }
+                              >
                                 <TableCell className="max-w-20 p-2 sm:p-3 align-top text-xs sm:text-sm">
                                   {d ? (
                                     <>
@@ -848,7 +870,7 @@ useEffect(() => {
                         <TableCell className="p-2 sm:p-3"></TableCell>
                         <TableCell className="font-bold p-2 sm:p-3 text-xs sm:text-sm">आजचा खर्च</TableCell>
                         <TableCell className="text-center p-2 sm:p-3 text-xs sm:text-sm">
-                          ₹ {day.todayExpense}
+                          ₹ {(Number(day.todayExpense) || 0).toLocaleString()}
                         </TableCell>
                       </TableRow>
                       <TableRow>
@@ -858,7 +880,7 @@ useEffect(() => {
                           अखेरी शिल्लक
                         </TableCell>
                         <TableCell className="text-center p-2 sm:p-3 text-xs sm:text-sm">
-                          ₹ {day.closing}
+                          ₹ {(Number(day.closing) || 0).toLocaleString()}
                         </TableCell>
                       </TableRow>
                       <TableRow>
