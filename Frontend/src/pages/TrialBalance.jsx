@@ -37,46 +37,59 @@ export default function TrialBalance() {
   const [societyInfo, setSocietyInfo] = useState(null);
 
   useEffect(() => {
-    const fetchSociety = async () => {
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/societies/${id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const s = res?.data?.society || res?.data;
-        setSocietyInfo(s);
-        console.log("Fetched society info:", s);
-      } catch (err) {
-        console.error("Failed to fetch society:", err);
-      }
-    };
-    if (id && token) fetchSociety();
-  }, [id, token]);
+  const fetchSociety = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/societies/${id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const s = res?.data?.society || res?.data;
+
+      setSocietyInfo(s);
+      setSocietyInitialBalance(Number(s.initialBalance) || 0); // ✅ SOURCE OF TRUTH
+
+      console.log("✅ INITIAL BALANCE FROM SOCIETY:", s.initialBalance);
+      console.log("✅ FIRST FY:", s.financialYearStart);
+
+    } catch (err) {
+      console.error("Failed to fetch society:", err);
+    }
+  };
+
+  if (id && token) fetchSociety();
+}, [id, token]);
 
   useEffect(() => {
-    const fetchEntries = async () => {
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/cashbook/${id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const list = Array.isArray(res.data)
-          ? res.data
-          : res.data?.entries || [];
-        setEntries(
-          list.map((e) => ({
-            date: (e.date || "").split("T")[0],
-            type: String(e.type || "").toLowerCase(),
-            amount: Number(e.amount) || 0,
-          }))
-        );
-        setSocietyInitialBalance(res.data?.initialBalance || 0);
-      } catch (err) {
-        console.error("Failed to fetch entries:", err);
-      }
-    };
-    if (id && token) fetchEntries();
-  }, [id, token]);
+  const fetchEntries = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/cashbook/${id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const list = Array.isArray(res.data)
+        ? res.data
+        : res.data?.entries || [];
+
+      setEntries(
+        list.map((e) => ({
+          date: (e.date || "").split("T")[0],
+          type: String(e.type || "").toLowerCase(),
+          amount: Number(e.amount) || 0,
+        }))
+      );
+
+      console.log("📘 Cashbook entries loaded:", list.length);
+
+    } catch (err) {
+      console.error("Failed to fetch entries:", err);
+    }
+  };
+
+  if (id && token) fetchEntries();
+}, [id, token]);
+
 
   const fiscalRangeFromLabel = (label) => {
     const parts = label.split("-");
@@ -158,45 +171,64 @@ export default function TrialBalance() {
   }, [id, token, selectedYear]);
 
   // Opening & closing calculation
-  useEffect(() => {
-    if (!selectedYear) {
-      setOpeningBalance(0);
-      setClosingBalance(0);
-      return;
-    }
+useEffect(() => {
+  if (!selectedYear || !societyInfo) {
+    setOpeningBalance(0);
+    setClosingBalance(0);
+    return;
+  }
 
-    const selectedFYLabel = `${selectedYear}-${selectedYear + 1}`;
-    const sortedYears = [...years].sort(
-      (a, b) => parseInt(a.split("-")[0]) - parseInt(b.split("-")[0])
+  const getFY = (dateStr) => {
+    const d = new Date(dateStr);
+    return d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+  };
+
+  // ✅ FIRST ACCOUNTING YEAR (SOURCE OF TRUTH)
+  const firstFY = new Date(
+    societyInfo.financialYearStart
+  ).getFullYear();
+
+  let running = societyInitialBalance;
+
+  // ✅ FIRST YEAR LOGIC
+  if (selectedYear === firstFY) {
+    const fyEntries = entries.filter(
+      (e) => getFY(e.date) === selectedYear
     );
 
-    let running = societyInitialBalance;
-    let found = false;
+    const net = fyEntries.reduce(
+      (sum, e) => sum + (e.type === "debit" ? e.amount : -e.amount),
+      0
+    );
 
-    for (let fy of sortedYears) {
-      const range = fiscalRangeFromLabel(fy);
-      const fyEntries = entries.filter(
-        (e) => e.date >= range.start && e.date <= range.end
-      );
+    setOpeningBalance(societyInitialBalance); // 💯 THIS WAS MISSING
+    setClosingBalance(societyInitialBalance + net);
+    return;
+  }
 
-      const opening = running;
-      fyEntries.forEach((e) => {
-        running += e.type === "debit" ? e.amount : -e.amount;
-      });
-      const closing = running;
+  // ✅ SUBSEQUENT YEARS
+  for (let y = firstFY; y <= selectedYear; y++) {
+    const fyEntries = entries.filter(
+      (e) => getFY(e.date) === y
+    );
 
-      if (fy === selectedFYLabel) {
-        setOpeningBalance(opening);
-        setClosingBalance(closing);
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      setOpeningBalance(running);
+    const opening = running;
+
+    const net = fyEntries.reduce(
+      (sum, e) => sum + (e.type === "debit" ? e.amount : -e.amount),
+      0
+    );
+
+    running = opening + net;
+
+    if (y === selectedYear) {
+      setOpeningBalance(opening);
       setClosingBalance(running);
+      return;
     }
-  }, [entries, years, selectedYear, societyInitialBalance]);
+  }
+}, [entries, selectedYear, societyInitialBalance, societyInfo]);
+
 
   useEffect(() => {
     const fetchMappings = async () => {
