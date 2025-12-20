@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useContext, useRef, useTransition } from "react";
+import React, { useMemo, useState, useEffect, useContext, useRef, useTransition, useDeferredValue } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import dayjs from "dayjs";
@@ -40,6 +40,7 @@ export default function TrialBalance() {
   const cacheRef = useRef({});
   const [isPending, startTransition] = useTransition();
   const [yearsLoaded, setYearsLoaded] = useState(false);
+  const deferredYear = useDeferredValue(selectedYear);
 
   useEffect(() => {
   const fetchSociety = async () => {
@@ -129,15 +130,24 @@ export default function TrialBalance() {
 }, [id, token]);
 
 useEffect(() => {
-  if (!id || !token || !selectedYear || !yearsLoaded) return;
+  if (!id || !token || !deferredYear || !yearsLoaded) return;
+
+  const controller = new AbortController();
 
   const fetchTrialBalance = async () => {
-    try {
+    const cached = cacheRef.current[deferredYear];
+    if (cached) {
+      setDebitHeads(cached.debitHeads);
+      setCreditHeads(cached.creditHeads);
+      setLoadingTB(false);
+    } else {
       setLoadingTB(true);
+    }
 
+    try {
       const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/reports/trial-balance/${id}?year=${selectedYear}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        `${import.meta.env.VITE_BACKEND_URL}/api/reports/trial-balance/${id}?year=${deferredYear}`,
+        { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal }
       );
 
       const rows = res.data?.trialBalance || [];
@@ -155,8 +165,7 @@ useEffect(() => {
       setDebitHeads(nextDebit);
       setCreditHeads(nextCredit);
 
-      // ✅ cache AFTER valid load
-      cacheRef.current[selectedYear] = {
+      cacheRef.current[deferredYear] = {
         debitHeads: nextDebit,
         creditHeads: nextCredit,
       };
@@ -168,7 +177,8 @@ useEffect(() => {
   };
 
   fetchTrialBalance();
-}, [id, token, selectedYear, yearsLoaded]);
+  return () => controller.abort();
+}, [id, token, deferredYear, yearsLoaded]);
 
 useEffect(() => {
   cacheRef.current = {};
@@ -176,7 +186,7 @@ useEffect(() => {
 
   // Opening & closing calculation
 useEffect(() => {
-  if (!selectedYear || !societyInfo) {
+  if (!deferredYear || !societyInfo) {
     setOpeningBalance(0);
     setClosingBalance(0);
     return;
@@ -195,9 +205,9 @@ useEffect(() => {
   let running = societyInitialBalance;
 
   // ✅ FIRST YEAR LOGIC
-  if (selectedYear === firstFY) {
+  if (deferredYear === firstFY) {
     const fyEntries = entries.filter(
-      (e) => getFY(e.date) === selectedYear
+      (e) => getFY(e.date) === deferredYear
     );
 
     const net = fyEntries.reduce(
@@ -211,7 +221,7 @@ useEffect(() => {
   }
 
   // ✅ SUBSEQUENT YEARS
-  for (let y = firstFY; y <= selectedYear; y++) {
+  for (let y = firstFY; y <= deferredYear; y++) {
     const fyEntries = entries.filter(
       (e) => getFY(e.date) === y
     );
@@ -225,24 +235,23 @@ useEffect(() => {
 
     running = opening + net;
 
-    if (y === selectedYear) {
+    if (y === deferredYear) {
       setOpeningBalance(opening);
       setClosingBalance(running);
       return;
     }
   }
-}, [entries, selectedYear, societyInitialBalance, societyInfo]);
+}, [entries, deferredYear, societyInitialBalance, societyInfo]);
 
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchMappings = async () => {
-      if (!selectedYear || !id || !token) return;
+      if (!deferredYear || !id || !token) return;
       try {
         const res = await axios.get(
-          `${
-            import.meta.env.VITE_BACKEND_URL
-          }/api/reports/mappings/${id}?year=${selectedYear}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${import.meta.env.VITE_BACKEND_URL}/api/reports/mappings/${id}?year=${deferredYear}`,
+          { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal }
         );
         const data = res.data?.data?.mappings || {};
         const detail = Object.fromEntries(
@@ -261,7 +270,8 @@ useEffect(() => {
     };
 
     fetchMappings();
-  }, [id, token, selectedYear]);
+    return () => controller.abort();
+  }, [id, token, deferredYear]);
 
   const handleMapping = async (compositeKey, value, side) => {
     const prev = mappings[compositeKey];
@@ -335,20 +345,19 @@ useEffect(() => {
     [creditHeads, closingBalance]
   );
 
-  const baseOptions = [
-    { value: "profitLoss", label: "Profit & Loss" },
-    { value: "balanceSheet", label: "Balance Sheet" },
-  ];
-  if (societyInfo?.type === "labour") {
-    baseOptions.push({
-      value: "construction",
-      label: "Construction Statement",
-    });
-  }
-
-  // Allow same report type to be mapped to multiple account heads
-  // Only filter out options that are already selected for the current account head
-  const options = baseOptions;
+  const options = useMemo(() => {
+    const base = [
+      { value: "profitLoss", label: "Profit & Loss" },
+      { value: "balanceSheet", label: "Balance Sheet" },
+    ];
+    if (societyInfo?.type === "labour") {
+      base.push({
+        value: "construction",
+        label: "Construction Statement",
+      });
+    }
+    return base;
+  }, [societyInfo?.type]);
   console.log("Available Options:", options);
   console.log("Mappings State:", mappings);
 
@@ -511,9 +520,11 @@ useEffect(() => {
                     return Array.from({ length: maxRows }).map((_, idx) => {
                       const d = debitHeads[idx];
                       const c = creditHeads[idx];
-
+                      const dk = d?.accountHeadId ?? `d-empty-${idx}`;
+                      const ck = c?.accountHeadId ?? `c-empty-${idx}`;
+                      const rowKey = `${dk}-${ck}`;
                       return (
-                        <TableRow key={idx} className="hover:bg-gray-50 transition-colors">
+                        <TableRow key={rowKey} className="hover:bg-gray-50 transition-colors">
                           <TableCell className="border-r border-gray-200 p-2 sm:p-3 align-top">
                             {d?.accountHeadName || ""}
                             {d && d.accountHeadName !== "आरंभी शिल्लक" && (() => {

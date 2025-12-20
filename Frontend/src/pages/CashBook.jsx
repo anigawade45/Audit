@@ -316,11 +316,12 @@ useEffect(() => {
           },
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        if (newEntry.type.toLowerCase() === "debit") {
-          setDebitHeadsList((prev) => [...prev, response.data.head.name]);
-        } else {
-          setCreditHeadsList((prev) => [...prev, response.data.head.name]);
-        }
+        const newHead = response.data.head.name;
+
+// ✅ add to BOTH lists
+setDebitHeadsList((prev) => [...new Set([...prev, newHead])]);
+setCreditHeadsList((prev) => [...new Set([...prev, newHead])]);
+
       }
 
       await axios.post(
