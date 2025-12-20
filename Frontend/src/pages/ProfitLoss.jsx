@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
-import dayjs from "dayjs";
 import { AuthContext } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
@@ -24,11 +23,20 @@ export default function ProfitLoss() {
   const [incomeEntries, setIncomeEntries] = useState([]);
   const [expenseEntries, setExpenseEntries] = useState([]);
   const [years, setYears] = useState([]);
-  const [selectedYear, setSelectedYear] = useState(dayjs().year());
+  const [selectedYear, setSelectedYear] = useState(null);
   const [societyInfo, setSocietyInfo] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [, setError] = useState(null);
-  const [, setRefreshing] = useState(false);
+  const [Error, setError] = useState(null);
+  const [Refreshing] = useState(false);
+  const [yearsLoaded, setYearsLoaded] = useState(false);
+  const [loadingReport, setLoadingReport] = useState(true);
+
+
+  const [refreshKey, setRefreshKey] = useState(
+    typeof window !== "undefined"
+      ? localStorage.getItem("reportRefreshKey") || ""
+      : ""
+  );
 
   const formatCurrency = (value) =>
     new Intl.NumberFormat("en-IN", {
@@ -58,80 +66,85 @@ export default function ProfitLoss() {
   }, [id, token]);
 
   useEffect(() => {
-    const fetchYears = async () => {
-      try {
-        setError(null);
-        const res = await axios.get(
-          `${
-            import.meta.env.VITE_BACKEND_URL
-          }/api/reports/profit-loss-data/${id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const mappings = Array.isArray(res.data?.mappings)
-          ? res.data.mappings
-          : [];
+  const fetchYears = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/reports/profit-loss-data/${id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-        // Unique years from API
-        const uniqueYears = [...new Set(mappings.map((m) => m.year))].sort(
-          (a, b) => b - a
-        );
+      const mappings = Array.isArray(res.data?.mappings)
+        ? res.data.mappings
+        : [];
 
-        const fyLabels = uniqueYears.map((y) => `${y}-${y + 1}`);
-        setYears(fyLabels);
+      const uniqueYears = [...new Set(mappings.map(m => m.year))].sort(
+        (a, b) => b - a
+      );
 
-        if (fyLabels.length > 0) {
-          setSelectedYear(parseInt(fyLabels[0].split("-")[0], 10));
-        }
-      } catch (err) {
-        console.error("Error fetching available years:", err);
-        setError("Failed to load available years");
-        const y = dayjs().year();
-        setYears([`${y}-${y + 1}`]);
-        setSelectedYear(y);
+      const fyLabels = uniqueYears.map(y => `${y}-${y + 1}`);
+      setYears(fyLabels);
+
+      if (uniqueYears.length > 0) {
+        setSelectedYear(uniqueYears[0]); // ✅ ONLY SOURCE OF TRUTH
+      }
+
+      setYearsLoaded(true);
+    } catch (err) {
+      console.error(err);
+      setYearsLoaded(true);
+    }
+  };
+
+  if (id && token) fetchYears();
+}, [id, token]);
+
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "reportRefreshKey") {
+        setRefreshKey(e.newValue);
       }
     };
-    if (id && token) fetchYears();
-  }, [id, token]);
-
-
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
 
   // fetch profit loss data
-  useEffect(() => {
-    const fetchProfitLoss = async () => {
-      if (!selectedYear) return;
-      try {
-        setRefreshing(true);
-        setError(null);
-        const res = await axios.get(
-          `${
-            import.meta.env.VITE_BACKEND_URL
-          }/api/reports/profit-loss-data/${id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        console.log("Profit Loss API Response:", res.data);
+ useEffect(() => {
+  if (!id || !token || !selectedYear || !yearsLoaded) return;
 
-        // Filter only selected year's mappings
-        const mappings = Array.isArray(res.data?.mappings)
-          ? res.data.mappings.filter((m) => m.year === selectedYear)
-          : [];
+  const fetchProfitLoss = async () => {
+    try {
+      setLoadingReport(true);
 
-        // Separate into income & expenses
-        const income = mappings.filter((m) => m.side === "debit");
-        const expenses = mappings.filter((m) => m.side === "credit");
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/reports/profit-loss-data/${id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-        setIncomeEntries(income);
-        setExpenseEntries(expenses);
-      } catch (err) {
-        console.error("Error fetching profit loss data:", err);
-        setError("Failed to load profit loss data");
-        setIncomeEntries([]);
-        setExpenseEntries([]);
-      } finally {
-        setRefreshing(false);
-      }
-    };
-    fetchProfitLoss();
-  }, [id, token, selectedYear]);
+      const mappings = Array.isArray(res.data?.mappings)
+        ? res.data.mappings.filter(m => m.year === selectedYear)
+        : [];
+
+      setIncomeEntries(
+        mappings.filter(m => m.side === "debit" && Number(m.amount) !== 0)
+      );
+
+      setExpenseEntries(
+        mappings.filter(m => m.side === "credit" && Number(m.amount) !== 0)
+      );
+    } catch (err) {
+      console.error(err);
+      setIncomeEntries([]);
+      setExpenseEntries([]);
+    } finally {
+      setLoadingReport(false);
+    }
+  };
+
+  fetchProfitLoss();
+}, [id, token, selectedYear, yearsLoaded, refreshKey]);
+
 
   const totalIncome = incomeEntries.reduce(
     (sum, entry) => sum + (entry.amount || 0),
@@ -271,61 +284,66 @@ export default function ProfitLoss() {
                 <TableHead className="text-center font-bold p-2 sm:p-3">रक्कम</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {Array.from(
-                {
-                  length: Math.max(incomeEntries.length, expenseEntries.length),
-                },
-                (_, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="text-center p-2 sm:p-3">
-                      {incomeEntries[i]?.accountHeadName || ""}
-                    </TableCell>
-                    <TableCell className="text-center p-2 sm:p-3">
-                      {incomeEntries[i]
-                        ? formatCurrency(incomeEntries[i].amount)
-                        : ""}
-                    </TableCell>
-                    <TableCell className="text-center p-2 sm:p-3">
-                      {expenseEntries[i]?.accountHeadName || ""}
-                    </TableCell>
-                    <TableCell className="text-center p-2 sm:p-3">
-                      {expenseEntries[i]
-                        ? formatCurrency(expenseEntries[i].amount)
-                        : ""}
-                    </TableCell>
-                  </TableRow>
-                )
-              )}
+           <TableBody>
+  {loadingReport &&
+    Array.from({ length: 5 }).map((_, i) => (
+      <TableRow key={`skeleton-${i}`}>
+        <TableCell colSpan={4} className="p-3">
+          <Skeleton className="h-6 w-full" />
+        </TableCell>
+      </TableRow>
+    ))}
 
-              {/* Nafa/Tota Calculation */}
-              <TableRow className="font-bold bg-gray-200 text-xs sm:text-sm">
-                <TableCell className="text-center p-2 sm:p-3">
-                  {isProfit ? "" : "तोटा"}
-                </TableCell>
-                <TableCell className="text-center p-2 sm:p-3">
-                  {isProfit ? "" : formatCurrency(balancingAmount)}
-                </TableCell>
-                <TableCell className="text-center p-2 sm:p-3">
-                  {isProfit ? "नफा" : ""}
-                </TableCell>
-                <TableCell className="text-center p-2 sm:p-3">
-                  {isProfit ? formatCurrency(balancingAmount) : ""}
-                </TableCell>
-              </TableRow>
+  {!loadingReport &&
+    incomeEntries.length === 0 &&
+    expenseEntries.length === 0 && (
+      <TableRow>
+        <TableCell colSpan={4} className="text-center p-4 text-gray-500">
+          या आर्थिक वर्षासाठी नोंदी उपलब्ध नाहीत
+        </TableCell>
+      </TableRow>
+    )}
 
-              {/* Final Ekun */}
-              <TableRow className="font-bold bg-gray-300 text-xs sm:text-sm">
-                <TableCell className="text-center p-2 sm:p-3">एकूण</TableCell>
-                <TableCell className="text-center p-2 sm:p-3">
-                  {formatCurrency(incomeTotalWithBalance)}
-                </TableCell>
-                <TableCell className="text-center p-2 sm:p-3">एकूण</TableCell>
-                <TableCell className="text-center p-2 sm:p-3">
-                  {formatCurrency(expenseTotalWithBalance)}
-                </TableCell>
-              </TableRow>
-            </TableBody>
+  {!loadingReport &&
+    Array.from(
+      { length: Math.max(incomeEntries.length, expenseEntries.length) },
+      (_, i) => (
+        <TableRow key={i}>
+          <TableCell className="text-center p-2 sm:p-3">
+            {incomeEntries[i]?.accountHeadName || ""}
+          </TableCell>
+          <TableCell className="text-center p-2 sm:p-3">
+            {incomeEntries[i]
+              ? formatCurrency(incomeEntries[i].amount)
+              : ""}
+          </TableCell>
+          <TableCell className="text-center p-2 sm:p-3">
+            {expenseEntries[i]?.accountHeadName || ""}
+          </TableCell>
+          <TableCell className="text-center p-2 sm:p-3">
+            {expenseEntries[i]
+              ? formatCurrency(expenseEntries[i].amount)
+              : ""}
+          </TableCell>
+        </TableRow>
+      )
+    )}
+
+  {!loadingReport &&
+    (incomeEntries.length > 0 || expenseEntries.length > 0) && (
+      <TableRow className="font-bold bg-gray-300 text-xs sm:text-sm">
+        <TableCell className="text-center p-2 sm:p-3">एकूण</TableCell>
+        <TableCell className="text-center p-2 sm:p-3">
+          {formatCurrency(incomeTotalWithBalance)}
+        </TableCell>
+        <TableCell className="text-center p-2 sm:p-3">एकूण</TableCell>
+        <TableCell className="text-center p-2 sm:p-3">
+          {formatCurrency(expenseTotalWithBalance)}
+        </TableCell>
+      </TableRow>
+    )}
+</TableBody>
+
           </Table>
         </div>
       </div>

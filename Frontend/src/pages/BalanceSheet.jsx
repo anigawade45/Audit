@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
-import dayjs from "dayjs";
 import { AuthContext } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
@@ -24,11 +23,19 @@ export default function BalanceSheet() {
   const [incomeEntries, setIncomeEntries] = useState([]);
   const [expenseEntries, setExpenseEntries] = useState([]);
   const [years, setYears] = useState([]);
-  const [selectedYear, setSelectedYear] = useState(dayjs().year());
+  const [selectedYear, setSelectedYear] = useState(null);
   const [societyInfo, setSocietyInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [, setError] = useState(null);
-  const [, setRefreshing] = useState(false);
+  const [Refreshing] = useState(false);
+  const [yearsLoaded, setYearsLoaded] = useState(false);
+  const [loadingReport, setLoadingReport] = useState(true);
+
+  const [refreshKey, setRefreshKey] = useState(
+    typeof window !== "undefined"
+      ? localStorage.getItem("reportRefreshKey") || ""
+      : ""
+  );
 
   const formatCurrency = (value) =>
     new Intl.NumberFormat("en-IN", {
@@ -57,48 +64,56 @@ export default function BalanceSheet() {
     if (id && token) fetchSociety();
   }, [id, token]);
 
+ useEffect(() => {
+  const fetchYears = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/reports/balance-sheet-data/${id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const mappings = Array.isArray(res.data?.mappings)
+        ? res.data.mappings
+        : [];
+
+      const uniqueYears = [...new Set(mappings.map(m => m.year))].sort(
+        (a, b) => b - a
+      );
+
+      const fyLabels = uniqueYears.map(y => `${y}-${y + 1}`);
+      setYears(fyLabels);
+
+      if (uniqueYears.length > 0) {
+        setSelectedYear(uniqueYears[0]); // ✅ ONLY SOURCE OF TRUTH
+      }
+
+      setYearsLoaded(true);
+    } catch (err) {
+      console.error(err);
+      setYearsLoaded(true);
+    }
+  };
+
+  if (id && token) fetchYears();
+}, [id, token]);
+
   useEffect(() => {
-    const fetchYears = async () => {
-      try {
-        setError(null);
-        const res = await axios.get(
-          `${
-            import.meta.env.VITE_BACKEND_URL
-          }/api/reports/balance-sheet-data/${id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const mappings = Array.isArray(res.data?.mappings)
-          ? res.data.mappings
-          : [];
-
-        // Unique years from API
-        const uniqueYears = [...new Set(mappings.map((m) => m.year))].sort(
-          (a, b) => b - a
-        );
-
-        const fyLabels = uniqueYears.map((y) => `${y}-${y + 1}`);
-        setYears(fyLabels);
-
-        if (fyLabels.length > 0) {
-          setSelectedYear(parseInt(fyLabels[0].split("-")[0], 10));
-        }
-      } catch (err) {
-        console.error("Error fetching available years:", err);
-        setError("Failed to load available years");
-        const y = dayjs().year();
-        setYears([`${y}-${y + 1}`]);
-        setSelectedYear(y);
+    const handler = (e) => {
+      if (e.key === "reportRefreshKey") {
+        setRefreshKey(e.newValue);
       }
     };
-    if (id && token) fetchYears();
-  }, [id, token]);
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
 
   // fetch profit loss data
   useEffect(() => {
-    const fetchProfitLoss = async () => {
-      if (!selectedYear) return;
+    const fetchBalanceSheet = async () => {
+      if (!id || !token || !selectedYear || !yearsLoaded) return;
+
       try {
-        setRefreshing(true);
+        setLoadingReport(true);
         setError(null);
         const res = await axios.get(
           `${
@@ -114,8 +129,12 @@ export default function BalanceSheet() {
           : [];
 
         // Separate into income & expenses
-        const income = mappings.filter((m) => m.side === "debit");
-        const expenses = mappings.filter((m) => m.side === "credit");
+        const income = mappings.filter(
+          (m) => m.side === "debit" && Number(m.amount) !== 0
+        );
+        const expenses = mappings.filter(
+          (m) => m.side === "credit" && Number(m.amount) !== 0
+        );
 
         setIncomeEntries(income);
         setExpenseEntries(expenses);
@@ -125,11 +144,11 @@ export default function BalanceSheet() {
         setIncomeEntries([]);
         setExpenseEntries([]);
       } finally {
-        setRefreshing(false);
+        setLoadingReport(false);
       }
     };
-    fetchProfitLoss();
-  }, [id, token, selectedYear]);
+    fetchBalanceSheet();
+  }, [id, token, selectedYear, refreshKey, yearsLoaded]);
 
   const totalIncome = incomeEntries.reduce(
     (sum, entry) => sum + (entry.amount || 0),
@@ -271,60 +290,88 @@ export default function BalanceSheet() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {Array.from(
-                {
-                  length: Math.max(incomeEntries.length, expenseEntries.length),
-                },
-                (_, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="text-center">
-                      {incomeEntries[i]?.accountHead || ""}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {incomeEntries[i]
-                        ? formatCurrency(incomeEntries[i].amount)
-                        : ""}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {expenseEntries[i]?.accountHead || ""}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {expenseEntries[i]
-                        ? formatCurrency(expenseEntries[i].amount)
-                        : ""}
-                    </TableCell>
-                  </TableRow>
-                )
-              )}
+  {/* 🔄 Loading */}
+  {loadingReport &&
+    Array.from({ length: 5 }).map((_, i) => (
+      <TableRow key={`skeleton-${i}`}>
+        <TableCell colSpan={4} className="p-3">
+          <Skeleton className="h-6 w-full" />
+        </TableCell>
+      </TableRow>
+    ))}
 
-              {/* Nafa/Tota Calculation */}
-              <TableRow className="font-bold bg-gray-200">
-                <TableCell className="text-center">
-                  {isProfit ? "" : "तोटा"}
-                </TableCell>
-                <TableCell className="text-center">
-                  {isProfit ? "" : formatCurrency(balancingAmount)}
-                </TableCell>
-                <TableCell className="text-center">
-                  {isProfit ? "नफा" : ""}
-                </TableCell>
-                <TableCell className="text-center">
-                  {isProfit ? formatCurrency(balancingAmount) : ""}
-                </TableCell>
-              </TableRow>
+  {/* ❌ No Data */}
+  {!loadingReport &&
+    incomeEntries.length === 0 &&
+    expenseEntries.length === 0 && (
+      <TableRow>
+        <TableCell colSpan={4} className="text-center p-4 text-gray-500">
+          या आर्थिक वर्षासाठी माहिती उपलब्ध नाही
+        </TableCell>
+      </TableRow>
+    )}
 
-              {/* Final Ekun */}
-              <TableRow className="font-bold bg-gray-300">
-                <TableCell className="text-center">एकूण</TableCell>
-                <TableCell className="text-center">
-                  {formatCurrency(incomeTotalWithBalance)}
-                </TableCell>
-                <TableCell className="text-center">एकूण</TableCell>
-                <TableCell className="text-center">
-                  {formatCurrency(expenseTotalWithBalance)}
-                </TableCell>
-              </TableRow>
-            </TableBody>
+  {/* ✅ Data Rows */}
+  {!loadingReport &&
+    Array.from(
+      { length: Math.max(incomeEntries.length, expenseEntries.length) },
+      (_, i) => (
+        <TableRow key={i}>
+          <TableCell className="text-center">
+            {incomeEntries[i]?.accountHead || ""}
+          </TableCell>
+          <TableCell className="text-center">
+            {incomeEntries[i]
+              ? formatCurrency(incomeEntries[i].amount)
+              : ""}
+          </TableCell>
+          <TableCell className="text-center">
+            {expenseEntries[i]?.accountHead || ""}
+          </TableCell>
+          <TableCell className="text-center">
+            {expenseEntries[i]
+              ? formatCurrency(expenseEntries[i].amount)
+              : ""}
+          </TableCell>
+        </TableRow>
+      )
+    )}
+
+  {/* ➕ Profit / Loss Row */}
+  {!loadingReport &&
+    (incomeEntries.length > 0 || expenseEntries.length > 0) && (
+      <TableRow className="font-bold bg-gray-200">
+        <TableCell className="text-center">
+          {isProfit ? "" : "तोटा"}
+        </TableCell>
+        <TableCell className="text-center">
+          {isProfit ? "" : formatCurrency(balancingAmount)}
+        </TableCell>
+        <TableCell className="text-center">
+          {isProfit ? "नफा" : ""}
+        </TableCell>
+        <TableCell className="text-center">
+          {isProfit ? formatCurrency(balancingAmount) : ""}
+        </TableCell>
+      </TableRow>
+    )}
+
+  {/* ➕ Totals */}
+  {!loadingReport &&
+    (incomeEntries.length > 0 || expenseEntries.length > 0) && (
+      <TableRow className="font-bold bg-gray-300">
+        <TableCell className="text-center">एकूण</TableCell>
+        <TableCell className="text-center">
+          {formatCurrency(incomeTotalWithBalance)}
+        </TableCell>
+        <TableCell className="text-center">एकूण</TableCell>
+        <TableCell className="text-center">
+          {formatCurrency(expenseTotalWithBalance)}
+        </TableCell>
+      </TableRow>
+    )}
+</TableBody>
+
           </Table>
         </div>
       </div>

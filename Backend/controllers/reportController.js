@@ -205,16 +205,15 @@ exports.getProfitLoss = async (req, res) => {
       return res.json({ success: true, mappings: [] });
     }
 
-    // Collect all accountHeadIds used for profitLoss mappings
+    // Collect profitLoss mappings and recompute amounts dynamically from CashBookEntry
     const idsSet = new Set();
     const raw = [];
-    docs.forEach((doc) => {
+    for (const doc of docs) {
       const mappingsObj =
         doc.mappings instanceof Map
           ? Object.fromEntries(doc.mappings)
           : doc.mappings;
-
-      for (const [key, mapping] of Object.entries(mappingsObj)) {
+      for (const [key, mapping] of Object.entries(mappingsObj || {})) {
         const [accountHeadId, sideKey] = String(key).split(":");
         if (!mongoose.Types.ObjectId.isValid(accountHeadId)) continue;
         if (mapping && mapping.reportType === "profitLoss") {
@@ -222,13 +221,12 @@ exports.getProfitLoss = async (req, res) => {
           raw.push({
             doc,
             accountHeadId,
-            amount: mapping.totalAmount || 0,
-            side: sideKey || mapping.side,
+            side: (sideKey || mapping.side || "").toLowerCase(),
             year: doc.year,
           });
         }
       }
-    });
+    }
 
     // Resolve names by ID once
     const ids = Array.from(idsSet)
@@ -237,14 +235,35 @@ exports.getProfitLoss = async (req, res) => {
     const heads = await AccountHead.find({ _id: { $in: ids } });
     const idToName = new Map(heads.map((h) => [String(h._id), h.name || ""]));
 
-    const profitLossMappings = raw.map((r) => ({
-      societyId: r.doc.societyId,
-      accountHeadId: r.accountHeadId,
-      accountHeadName: idToName.get(r.accountHeadId) || "",
-      amount: r.amount,
-      side: r.side,
-      year: r.year,
-    }));
+    // Compute per mapping using CashBookEntry totals within that FY
+    const profitLossMappings = [];
+    for (const r of raw) {
+      const { start, end } = (function getFYRangeFromYear(startYearNumber) {
+        const start = new Date(`${startYearNumber}-04-01`);
+        const end = new Date(`${startYearNumber + 1}-03-31T23:59:59.999Z`);
+        return { start, end };
+      })(r.year);
+      const entries = await CashBookEntry.find({
+        societyId: new mongoose.Types.ObjectId(r.doc.societyId),
+        accountHead: new mongoose.Types.ObjectId(r.accountHeadId),
+        date: { $gte: start, $lte: end },
+      });
+      let debit = 0;
+      let credit = 0;
+      for (const e of entries) {
+        if (String(e.type).toLowerCase() === "debit") debit += Number(e.amount) || 0;
+        else credit += Number(e.amount) || 0;
+      }
+      const amount = r.side === "debit" ? debit : credit;
+      profitLossMappings.push({
+        societyId: r.doc.societyId,
+        accountHeadId: r.accountHeadId,
+        accountHeadName: idToName.get(r.accountHeadId) || "",
+        amount,
+        side: r.side,
+        year: r.year,
+      });
+    }
 
     res.json({
       success: true,

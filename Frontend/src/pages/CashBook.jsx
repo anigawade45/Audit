@@ -93,7 +93,6 @@ export default function CashBook() {
       toast.error("Please select at least one entry to delete");
       return;
     }
-
     try {
       const response = await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/api/cashbook/batch-delete`,
@@ -107,6 +106,7 @@ export default function CashBook() {
         setDeleteMode(false);
         setShowConfirm(false);
         toast.success(`${selectedIds.length} entries deleted successfully!`);
+        localStorage.setItem("reportRefreshKey", String(Date.now()));
       }
     } catch (err) {
       console.error("Delete Error:", err);
@@ -363,6 +363,7 @@ useEffect(() => {
       });
 
       toast.success("Entry added successfully!");
+      localStorage.setItem("reportRefreshKey", String(Date.now()));
     } catch (err) {
       console.error("Add Entry Error:", err);
       const errorMsg =

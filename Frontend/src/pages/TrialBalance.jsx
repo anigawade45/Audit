@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useContext, useRef } from "react";
+import React, { useMemo, useState, useEffect, useContext, useRef, useTransition } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import dayjs from "dayjs";
@@ -19,6 +19,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function TrialBalance() {
   const { id } = useParams();
@@ -35,6 +36,10 @@ export default function TrialBalance() {
   const [years, setYears] = useState([]);
   const [selectedYear, setSelectedYear] = useState(dayjs().year());
   const [societyInfo, setSocietyInfo] = useState(null);
+  const [loadingTB, setLoadingTB] = useState(false);
+  const cacheRef = useRef({});
+  const [isPending, startTransition] = useTransition();
+  const [yearsLoaded, setYearsLoaded] = useState(false);
 
   useEffect(() => {
   const fetchSociety = async () => {
@@ -91,84 +96,83 @@ export default function TrialBalance() {
 }, [id, token]);
 
 
-  const fiscalRangeFromLabel = (label) => {
-    const parts = label.split("-");
-    if (parts.length < 2) return null;
-    const startYear = parseInt(parts[0], 10);
-    const endYear = startYear + 1;
-    return {
-      start: `${startYear}-04-01`,
-      end: `${endYear}-03-31`,
-    };
-  };
+  // removed unused helper
 
   // fetch years
   useEffect(() => {
-    const fetchYears = async () => {
-      try {
-        const res = await axios.get(
-          `${
-            import.meta.env.VITE_BACKEND_URL
-          }/api/reports/trial-balance/years/${id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const list = Array.isArray(res.data?.years) ? res.data.years : [];
-        const fyLabels = list
-          .map((y) => (typeof y === "number" ? `${y}-${y + 1}` : y))
-          .filter(Boolean);
+  const fetchYears = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/reports/trial-balance/years/${id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-        fyLabels.sort((a, b) => {
-          const aStart = parseInt(a.split("-")[0], 10);
-          const bStart = parseInt(b.split("-")[0], 10);
-          return bStart - aStart;
-        });
+      const list = Array.isArray(res.data?.years) ? res.data.years : [];
+      const fyLabels = list
+        .map((y) => (typeof y === "number" ? `${y}-${y + 1}` : y))
+        .filter(Boolean)
+        .sort((a, b) => parseInt(b) - parseInt(a));
 
-        setYears(fyLabels);
-        if (fyLabels.length > 0) {
-          setSelectedYear(parseInt(fyLabels[0].split("-")[0], 10));
-        }
-      } catch (err) {
-        console.error("Error fetching available years:", err);
-        const y = dayjs().year();
-        setYears([`${y}-${y + 1}`]);
-        setSelectedYear(y);
+      setYears(fyLabels);
+
+      if (fyLabels.length > 0) {
+        setSelectedYear(parseInt(fyLabels[0].split("-")[0], 10));
       }
-    };
-    if (id && token) fetchYears();
-  }, [id, token]);
 
-  // fetch trial balance
-  useEffect(() => {
-    const fetchTrialBalance = async () => {
-      if (!selectedYear) return;
-      try {
-        const res = await axios.get(
-          `${
-            import.meta.env.VITE_BACKEND_URL
-          }/api/reports/trial-balance/${id}?year=${selectedYear}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+      setYearsLoaded(true); // ✅ IMPORTANT
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-        const rows = Array.isArray(res.data?.trialBalance)
-          ? res.data.trialBalance
-          : [];
+  if (id && token) fetchYears();
+}, [id, token]);
 
-        const normalized = rows.map((it, idx) => ({
-          accountHeadId: it.accountHeadId || `row-${idx}`,
-          accountHeadName: it.accountHeadName || "",
-          debit: it.debit || 0,
-          credit: it.credit || 0,
-        }));
+useEffect(() => {
+  if (!id || !token || !selectedYear || !yearsLoaded) return;
 
-        setDebitHeads(normalized.filter((t) => (t.debit || 0) > 0));
-        setCreditHeads(normalized.filter((t) => (t.credit || 0) > 0));
-      } catch (err) {
-        console.error("Error fetching trial balance:", err);
-      }
-    };
+  const fetchTrialBalance = async () => {
+    try {
+      setLoadingTB(true);
 
-    fetchTrialBalance();
-  }, [id, token, selectedYear]);
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/reports/trial-balance/${id}?year=${selectedYear}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const rows = res.data?.trialBalance || [];
+
+      const normalized = rows.map((it, idx) => ({
+        accountHeadId: it.accountHeadId || `row-${idx}`,
+        accountHeadName: it.accountHeadName || "",
+        debit: it.debit || 0,
+        credit: it.credit || 0,
+      }));
+
+      const nextDebit = normalized.filter((t) => t.debit > 0);
+      const nextCredit = normalized.filter((t) => t.credit > 0);
+
+      setDebitHeads(nextDebit);
+      setCreditHeads(nextCredit);
+
+      // ✅ cache AFTER valid load
+      cacheRef.current[selectedYear] = {
+        debitHeads: nextDebit,
+        creditHeads: nextCredit,
+      };
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingTB(false);
+    }
+  };
+
+  fetchTrialBalance();
+}, [id, token, selectedYear, yearsLoaded]);
+
+useEffect(() => {
+  cacheRef.current = {};
+}, [id]);
 
   // Opening & closing calculation
 useEffect(() => {
@@ -435,9 +439,9 @@ useEffect(() => {
             </p>
           </div>
           <div className="mt-3 print-hide">
-            <select
+              <select
               value={selectedYear}
-              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              onChange={(e) => startTransition(() => setSelectedYear(parseInt(e.target.value)))}
               className="border px-2 py-1 rounded w-full sm:w-auto"
             >
               {years.map((fy) => (
@@ -450,7 +454,7 @@ useEffect(() => {
         </div>
 
         {/* Table */}
-        <div className="border-2 border-gray-200 shadow-lg overflow-x-auto -mx-4 sm:mx-0">
+        <div className="border-2 border-gray-200 shadow-lg overflow-x-auto -mx-4 sm:mx-0" aria-busy={loadingTB || isPending}>
           <Table className="border-collapse min-w-[640px] sm:min-w-full text-xs sm:text-sm">
             <TableHeader>
               <TableRow>
@@ -469,239 +473,241 @@ useEffect(() => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {/* Opening Balance Row */}
-              <TableRow className="font-bold bg-gray-50 hover:bg-gary-100 transition-colors text-xs sm:text-sm">
-                <TableCell className="font-semibold text-gray-800 border-r border-gray-200 p-2 sm:p-3">
-                  आरंभी शिल्लक
-                </TableCell>
-                <TableCell className="text-center font-semibold text-green-600 border-r border-gray-200 p-2 sm:p-3">
-                  ₹ {openingBalance.toLocaleString()}
-                </TableCell>
-                <TableCell className="border-r border-gray-200"></TableCell>
-                <TableCell></TableCell>
-              </TableRow>
+              {(loadingTB || isPending) &&
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    <TableCell colSpan={4} className="p-3">
+                      <Skeleton className="h-6 w-full" />
+                    </TableCell>
+                  </TableRow>
+                ))}
 
-              {/* Dynamic Rows */}
-              {(() => {
-                const maxRows = Math.max(debitHeads.length, creditHeads.length);
-                return Array.from({ length: maxRows }).map((_, idx) => {
-                  const d = debitHeads[idx];
-                  const c = creditHeads[idx];
+              {!loadingTB &&
+                !isPending &&
+                debitHeads.length === 0 &&
+                creditHeads.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center p-4 text-gray-500">
+                      या आर्थिक वर्षासाठी माहिती उपलब्ध नाही
+                    </TableCell>
+                  </TableRow>
+                )}
 
-                  return (
-                    <TableRow
-                      key={idx}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
-                      {/* Debit Side */}
-                      <TableCell className="border-r border-gray-200 p-2 sm:p-3 align-top">
-                        {d?.accountHeadName || ""}
-                        {d && d.accountHeadName !== "आरंभी शिल्लक" && (() => {
-                          const key = `${d.accountHeadId}:debit`;
-                          const m = mappings[key];
-                          const isMapped = !!m?.reportType && m.side === "debit";
-                          const opp = mappings[`${d.accountHeadId}:credit`];
-                          const isAutoLocked = !!opp && opp.reportType === "balanceSheet";
-                          if (isMapped) {
-                            return (
-                              <div className="mt-1 sm:mt-0 ml-0 sm:ml-2 flex items-center gap-2 print-hide">
-                                <CheckCircle className="w-4 h-4 text-green-600" />
-                                <span className="text-xs sm:text-sm text-green-600">
-                                  {m.reportType === "balanceSheet" ? "Mapped to Balance Sheet (Debit)" : "Mapped to Profit & Loss"}
-                                </span>
-                                <select
-                                  className="ml-2 border px-1 py-0.5 rounded"
-                                  value={m?.reportType || ""}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    if (val === "__remove__") {
-                                      handleMapping(key, null, "debit");
-                                    } else {
-                                      handleMapping(key, val, "debit");
-                                    }
-                                  }}
-                                >
-                                  <option value="">-- Select Mapping --</option>
-                                  {options.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>
-                                      {opt.label}
-                                    </option>
-                                  ))}
-                                  <option value="__remove__">Remove Mapping</option>
-                                </select>
-                              </div>
-                            );
-                          }
-                          if (isAutoLocked) {
-                            return (
-                              <div className="mt-1 sm:mt-0 ml-0 sm:ml-2 flex items-center gap-2 text-gray-500 print-hide">
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Lock className="w-4 h-4" />
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    Auto-locked because opposite side is used for Balance Sheet calculation
-                                  </TooltipContent>
-                                </Tooltip>
-                                <span className="text-xs sm:text-sm">Auto-locked</span>
-                                <select
-                                  className="ml-2 border px-1 py-0.5 rounded opacity-50 cursor-not-allowed"
-                                  value=""
-                                  disabled
-                                >
-                                  <option value="">-- Select Mapping --</option>
-                                  {options.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>
-                                      {opt.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            );
-                          }
-                          return (
-                            <select
-                              className="mt-1 sm:mt-0 ml-0 sm:ml-2 border px-1 py-0.5 rounded print-hide w-full sm:w-auto"
-                              value={m?.reportType || ""}
-                              onChange={(e) =>
-                                handleMapping(key, e.target.value, "debit", d.debit)
+              {!loadingTB && !isPending && (
+                <>
+                  <TableRow className="font-bold bg-gray-50 hover:bg-gary-100 transition-colors text-xs sm:text-sm">
+                    <TableCell className="font-semibold text-gray-800 border-r border-gray-200 p-2 sm:p-3">
+                      आरंभी शिल्लक
+                    </TableCell>
+                    <TableCell className="text-center font-semibold text-green-600 border-r border-gray-200 p-2 sm:p-3">
+                      ₹ {openingBalance.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="border-r border-gray-200"></TableCell>
+                    <TableCell></TableCell>
+                  </TableRow>
+
+                  {(() => {
+                    const maxRows = Math.max(debitHeads.length, creditHeads.length);
+                    return Array.from({ length: maxRows }).map((_, idx) => {
+                      const d = debitHeads[idx];
+                      const c = creditHeads[idx];
+
+                      return (
+                        <TableRow key={idx} className="hover:bg-gray-50 transition-colors">
+                          <TableCell className="border-r border-gray-200 p-2 sm:p-3 align-top">
+                            {d?.accountHeadName || ""}
+                            {d && d.accountHeadName !== "आरंभी शिल्लक" && (() => {
+                              const key = `${d.accountHeadId}:debit`;
+                              const m = mappings[key];
+                              const isMapped = !!m?.reportType && m.side === "debit";
+                              const opp = mappings[`${d.accountHeadId}:credit`];
+                              const isAutoLocked = !!opp && opp.reportType === "balanceSheet";
+                              if (isMapped) {
+                                return (
+                                  <div className="mt-1 sm:mt-0 ml-0 sm:ml-2 flex items-center gap-2 print-hide">
+                                    <CheckCircle className="w-4 h-4 text-green-600" />
+                                    <span className="text-xs sm:text-sm text-green-600">
+                                      {m.reportType === "balanceSheet" ? "Mapped to Balance Sheet (Debit)" : "Mapped to Profit & Loss"}
+                                    </span>
+                                    <select
+                                      className="ml-2 border px-1 py-0.5 rounded"
+                                      value={m?.reportType || ""}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val === "__remove__") {
+                                          handleMapping(key, null, "debit");
+                                        } else {
+                                          handleMapping(key, val, "debit");
+                                        }
+                                      }}
+                                    >
+                                      <option value="">-- Select Mapping --</option>
+                                      {options.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>
+                                          {opt.label}
+                                        </option>
+                                      ))}
+                                      <option value="__remove__">Remove Mapping</option>
+                                    </select>
+                                  </div>
+                                );
                               }
-                            >
-                              <option value="">-- Select Mapping --</option>
-                              {options.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
-                          );
-                        })()}
-                      </TableCell>
-                      <TableCell className="text-center border-r border-gray-200 p-2 sm:p-3">
-                        {d ? `₹ ${d.debit?.toLocaleString?.() || ""}` : ""}
-                      </TableCell>
-
-                      {/* Credit Side */}
-                      <TableCell className="border-r border-gray-200 p-2 sm:p-3 align-top">
-                        {c?.accountHeadName || ""}
-                        {c && c.accountHeadName !== "अखेरी शिल्लक" && (() => {
-                          const key = `${c.accountHeadId}:credit`;
-                          const m = mappings[key];
-                          const isMapped = !!m?.reportType && m.side === "credit";
-                          const opp = mappings[`${c.accountHeadId}:debit`];
-                          const isAutoLocked = !!opp && opp.reportType === "balanceSheet";
-                          if (isMapped) {
-                            return (
-                              <div className="mt-1 sm:mt-0 ml-0 sm:ml-2 flex items-center gap-2 print-hide">
-                                <CheckCircle className="w-4 h-4 text-green-600" />
-                                <span className="text-xs sm:text-sm text-green-600">
-                                  {m.reportType === "balanceSheet" ? "Mapped to Balance Sheet (Credit)" : "Mapped to Profit & Loss"}
-                                </span>
-                                <select
-                                  className="ml-2 border px-1 py-0.5 rounded"
-                                  value={m?.reportType || ""}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    if (val === "__remove__") handleMapping(key, null, "credit");
-                                    else handleMapping(key, val, "credit");
-                                  }}
-                                >
-                                  <option value="">-- Select Mapping --</option>
-                                  {options.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>
-                                      {opt.label}
-                                    </option>
-                                  ))}
-                                  <option value="__remove__">Remove Mapping</option>
-                                </select>
-                              </div>
-                            );
-                          }
-                          if (isAutoLocked) {
-                            return (
-                              <div className="mt-1 sm:mt-0 ml-0 sm:ml-2 flex items-center gap-2 text-gray-500 print-hide">
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Lock className="w-4 h-4" />
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    Auto-locked because opposite side is used for Balance Sheet calculation
-                                  </TooltipContent>
-                                </Tooltip>
-                                <span className="text-xs sm:text-sm">Auto-locked</span>
-                                <select
-                                  className="ml-2 border px-1 py-0.5 rounded opacity-50 cursor-not-allowed"
-                                  value=""
-                                  disabled
-                                >
-                                  <option value="">-- Select Mapping --</option>
-                                  {options.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>
-                                      {opt.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            );
-                          }
-                          return (
-                            <select
-                              className="mt-1 sm:mt-0 ml-0 sm:ml-2 border px-1 py-0.5 rounded print-hide w-full sm:w-auto"
-                              value={m?.reportType || ""}
-                              onChange={(e) =>
-                                handleMapping(
-                                  key,
-                                  e.target.value,
-                                  "credit",
-                                  c.credit
-                                )
+                              if (isAutoLocked) {
+                                return (
+                                  <div className="mt-1 sm:mt-0 ml-0 sm:ml-2 flex items-center gap-2 text-gray-500 print-hide">
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Lock className="w-4 h-4" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        Auto-locked because opposite side is used for Balance Sheet calculation
+                                      </TooltipContent>
+                                    </Tooltip>
+                                    <span className="text-xs sm:text-sm">Auto-locked</span>
+                                    <select
+                                      className="ml-2 border px-1 py-0.5 rounded opacity-50 cursor-not-allowed"
+                                      value=""
+                                      disabled
+                                    >
+                                      <option value="">-- Select Mapping --</option>
+                                      {options.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>
+                                          {opt.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                );
                               }
-                            >
-                              <option value="">-- Select Mapping --</option>
-                              {options.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
-                          );
-                        })()}
-                      </TableCell>
-                      <TableCell className="text-center p-2 sm:p-3">
-                        {c ? `₹ ${c.credit?.toLocaleString?.() || ""}` : ""}
-                      </TableCell>
-                    </TableRow>
-                  );
-                });
-              })()}
+                              return (
+                                <select
+                                  className="mt-1 sm:mt-0 ml-0 sm:ml-2 border px-1 py-0.5 rounded print-hide w-full sm:w-auto"
+                                  value={m?.reportType || ""}
+                                  onChange={(e) => handleMapping(key, e.target.value, "debit", d.debit)}
+                                >
+                                  <option value="">-- Select Mapping --</option>
+                                  {options.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell className="text-center border-r border-gray-200 p-2 sm:p-3">
+                            {d ? `₹ ${d.debit?.toLocaleString?.() || ""}` : ""}
+                          </TableCell>
 
-              {/* Closing Balance Row */}
-              <TableRow className="font-bold bg-gray-50 hover:bg-gray-100 transition-colors text-xs sm:text-sm">
-                <TableCell className="border-r border-gray-200"></TableCell>
-                <TableCell className="border-r border-gray-200"></TableCell>
-                <TableCell className="font-semibold text-gray-800 border-r border-gray-200 p-2 sm:p-3">
-                  अखेरी शिल्लक
-                </TableCell>
-                <TableCell className="text-center font-semibold text-green-600 p-2 sm:p-3">
-                  ₹ {closingBalance.toLocaleString()}
-                </TableCell>
-              </TableRow>
+                          <TableCell className="border-r border-gray-200 p-2 sm:p-3 align-top">
+                            {c?.accountHeadName || ""}
+                            {c && c.accountHeadName !== "अखेरी शिल्लक" && (() => {
+                              const key = `${c.accountHeadId}:credit`;
+                              const m = mappings[key];
+                              const isMapped = !!m?.reportType && m.side === "credit";
+                              const opp = mappings[`${c.accountHeadId}:debit`];
+                              const isAutoLocked = !!opp && opp.reportType === "balanceSheet";
+                              if (isMapped) {
+                                return (
+                                  <div className="mt-1 sm:mt-0 ml-0 sm:ml-2 flex items-center gap-2 print-hide">
+                                    <CheckCircle className="w-4 h-4 text-green-600" />
+                                    <span className="text-xs sm:text-sm text-green-600">
+                                      {m.reportType === "balanceSheet" ? "Mapped to Balance Sheet (Credit)" : "Mapped to Profit & Loss"}
+                                    </span>
+                                    <select
+                                      className="ml-2 border px-1 py-0.5 rounded"
+                                      value={m?.reportType || ""}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val === "__remove__") handleMapping(key, null, "credit");
+                                        else handleMapping(key, val, "credit");
+                                      }}
+                                    >
+                                      <option value="">-- Select Mapping --</option>
+                                      {options.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>
+                                          {opt.label}
+                                        </option>
+                                      ))}
+                                      <option value="__remove__">Remove Mapping</option>
+                                    </select>
+                                  </div>
+                                );
+                              }
+                              if (isAutoLocked) {
+                                return (
+                                  <div className="mt-1 sm:mt-0 ml-0 sm:ml-2 flex items-center gap-2 text-gray-500 print-hide">
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Lock className="w-4 h-4" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        Auto-locked because opposite side is used for Balance Sheet calculation
+                                      </TooltipContent>
+                                    </Tooltip>
+                                    <span className="text-xs sm:text-sm">Auto-locked</span>
+                                    <select className="ml-2 border px-1 py-0.5 rounded opacity-50 cursor-not-allowed" value="" disabled>
+                                      <option value="">-- Select Mapping --</option>
+                                      {options.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>
+                                          {opt.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <select
+                                  className="mt-1 sm:mt-0 ml-0 sm:ml-2 border px-1 py-0.5 rounded print-hide w-full sm:w-auto"
+                                  value={m?.reportType || ""}
+                                  onChange={(e) => handleMapping(key, e.target.value, "credit", c.credit)}
+                                >
+                                  <option value="">-- Select Mapping --</option>
+                                  {options.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell className="text-center p-2 sm:p-3">
+                            {c ? `₹ ${c.credit?.toLocaleString?.() || ""}` : ""}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    });
+                  })()}
 
-              {/* Totals */}
-              <TableRow className="font-bold bg-gray-100 hover:bg-gray-200 transition-colors text-xs sm:text-sm">
-                <TableCell className="font-semibold text-gray-800 border-r border-gray-300 p-2 sm:p-3">
-                  एकूण
-                </TableCell>
-                <TableCell className="text-center font-semibold text-gray-700 border-r border-gray-300 p-2 sm:p-3">
-                  ₹ {totalDebit.toLocaleString()}
-                </TableCell>
-                <TableCell className="font-semibold text-gray-800 border-r border-gray-300 p-2 sm:p-3">
-                  एकूण
-                </TableCell>
-                <TableCell className="text-center font-semibold text-gray-700 p-2 sm:p-3">
-                  ₹ {totalCredit.toLocaleString()}
-                </TableCell>
-              </TableRow>
+                  <TableRow className="font-bold bg-gray-50 hover:bg-gray-100 transition-colors text-xs sm:text-sm">
+                    <TableCell className="border-r border-gray-200"></TableCell>
+                    <TableCell className="border-r border-gray-200"></TableCell>
+                    <TableCell className="font-semibold text-gray-800 border-r border-gray-200 p-2 sm:p-3">
+                      अखेरी शिल्लक
+                    </TableCell>
+                    <TableCell className="text-center font-semibold text-green-600 p-2 sm:p-3">
+                      ₹ {closingBalance.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+
+                  <TableRow className="font-bold bg-gray-100 hover:bg-gray-200 transition-colors text-xs sm:text-sm">
+                    <TableCell className="font-semibold text-gray-800 border-r border-gray-300 p-2 sm:p-3">
+                      एकूण
+                    </TableCell>
+                    <TableCell className="text-center font-semibold text-gray-700 border-r border-gray-300 p-2 sm:p-3">
+                      ₹ {totalDebit.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="font-semibold text-gray-800 border-r border-gray-300 p-2 sm:p-3">
+                      एकूण
+                    </TableCell>
+                    <TableCell className="text-center font-semibold text-gray-700 p-2 sm:p-3">
+                      ₹ {totalCredit.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                </>
+              )}
             </TableBody>
           </Table>
         </div>
